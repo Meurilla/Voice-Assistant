@@ -25,246 +25,849 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
 
 ## 1. Scope Control
 
-- [ ] `PHASE_1.md` has been reviewed before exit.
-- [ ] No out-of-scope Phase 1 features were added.
-- [ ] No wake word behavior exists.
-- [ ] No speech-to-text behavior exists.
-- [ ] No text-to-speech behavior exists.
-- [ ] No GUI or web UI exists.
-- [ ] No Home Assistant or smart home control exists.
-- [ ] No autonomous agent behavior exists.
-- [ ] No tool-calling system exists.
-- [ ] No long-term memory system exists.
-- [ ] No vector database, embeddings, or retrieval system exists.
-- [ ] No multi-provider routing or fallback system exists.
-- [ ] Any deferred ideas were recorded outside the implementation path.
+- [x] `PHASE_1.md` has been reviewed before exit.
+  - Evidence: `PHASE_1.md` was re-read during this exit-criteria pass.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No out-of-scope Phase 1 features were added.
+  - Evidence: Source review of `main.py`, `interfaces/`, `core/`, `providers/`, `config/`, tests, README, and `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes: Current implementation remains CLI-only, text-only, one-provider, local-config, local-log Phase 1 scope.
+- [x] No wake word behavior exists.
+  - Evidence: Source review of implemented modules and README limitations.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No speech-to-text behavior exists.
+  - Evidence: Source review of implemented modules and dependency list in `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes: No speech library is present.
+- [x] No text-to-speech behavior exists.
+  - Evidence: Source review of implemented modules and dependency list in `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes: No speech library is present.
+- [x] No GUI or web UI exists.
+  - Evidence: Source review of `main.py`, `interfaces/cli.py`, README limitations, and dependency list.
+  - Date: 2026-07-08
+  - Notes: The only user interface is the CLI loop.
+- [x] No Home Assistant or smart home control exists.
+  - Evidence: Source review of implemented modules and dependency list in `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No autonomous agent behavior exists.
+  - Evidence: Source review of assistant/provider code and README limitations.
+  - Date: 2026-07-08
+  - Notes: The assistant only responds to direct CLI prompts.
+- [x] No tool-calling system exists.
+  - Evidence: Source review of provider and assistant interfaces.
+  - Date: 2026-07-08
+  - Notes: Provider returns plain text only.
+- [x] No long-term memory system exists.
+  - Evidence: Source review of `core/session.py` and README limitations.
+  - Date: 2026-07-08
+  - Notes: Session history is in-memory only for the current process.
+- [x] No vector database, embeddings, or retrieval system exists.
+  - Evidence: Source review of implemented modules and dependency list in `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No multi-provider routing or fallback system exists.
+  - Evidence: `config/settings.toml` sets `provider_name = "gemini"`; `core/config.py` rejects non-Gemini providers.
+  - Date: 2026-07-08
+  - Notes: Transient retry is provider-local, not provider fallback.
+- [x] Any deferred ideas were recorded outside the implementation path.
+  - Evidence: `PHASE_1.md` contains a later-phase parking lot; README lists out-of-scope capabilities.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 2. Project Structure
 
-- [ ] Project structure matches the approved Phase 1 shape or has documented deviations.
-- [ ] CLI code is isolated under the interface layer.
-- [ ] Assistant orchestration is isolated under the core layer.
-- [ ] LLM provider code is isolated under the provider layer.
-- [ ] Configuration files are isolated under the config area.
-- [ ] Tests are isolated under the tests area.
-- [ ] Runtime logs are isolated under the logs area.
-- [ ] No module has mixed unrelated responsibilities.
-- [ ] The assistant core can be tested without live network calls.
+- [x] Project structure matches the approved Phase 1 shape or has documented deviations.
+  - Evidence: Source tree contains `main.py`, `config/`, `core/`, `interfaces/`, `providers/`, `tests/`, `logs/`, README, phase docs, and `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes: Additional Phase 1 support files include `.gitignore`, `test_cli.py`, and `test_gemini_provider.py`.
+- [x] CLI code is isolated under the interface layer.
+  - Evidence: CLI loop and startup wiring are in `interfaces/cli.py`; `main.py` only calls `run()`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant orchestration is isolated under the core layer.
+  - Evidence: `core/assistant.py` handles validation, provider call orchestration, session updates, and logging calls.
+  - Date: 2026-07-08
+  - Notes:
+- [x] LLM provider code is isolated under the provider layer.
+  - Evidence: Provider protocol is in `providers/base.py`; Gemini adapter is in `providers/gemini_provider.py`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Configuration files are isolated under the config area.
+  - Evidence: Non-secret runtime config is `config/settings.toml`; editable prompt is `config/system_prompt.txt`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Tests are isolated under the tests area.
+  - Evidence: Automated tests are under `tests/`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Runtime logs are isolated under the logs area.
+  - Evidence: `config/settings.toml` sets `log_file = "logs/interactions.jsonl"`; `logs/.gitkeep` preserves the directory.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No module has mixed unrelated responsibilities.
+  - Evidence: Source review shows separated config, safety, session, assistant orchestration, logging, CLI, and provider responsibilities.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant core can be tested without live network calls.
+  - Evidence: `tests/test_assistant.py` injects fake providers; `tests/test_gemini_provider.py` injects fake clients.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 3. Configuration
 
-- [ ] Non-secret settings load from a local config file.
-- [ ] The system prompt loads from a separate editable prompt file.
-- [ ] API keys are loaded from environment variables.
-- [ ] No secrets are hardcoded in source files.
-- [ ] `session_history_max_messages` is explicit and defaults to 10.
-- [ ] `max_user_input_chars` is explicit and defaults to 8,000.
-- [ ] `provider_timeout_seconds` is explicit and defaults to 30.
-- [ ] Missing config produces a clear startup error.
-- [ ] Invalid config produces a clear startup error.
-- [ ] Missing prompt file produces a clear startup error.
-- [ ] Missing API key produces a clear startup error.
-- [ ] Config defaults are explicit and documented.
-- [ ] No silent fallback hides unsafe or invalid configuration.
+- [x] Non-secret settings load from a local config file.
+  - Evidence: `core/config.py::load_config` reads TOML from `config/settings.toml`; `tests/test_config.py` verifies required values.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The system prompt loads from a separate editable prompt file.
+  - Evidence: `core/config.py::load_system_prompt` reads `config/system_prompt.txt`; prompt loading is tested.
+  - Date: 2026-07-08
+  - Notes:
+- [x] API keys are loaded from environment variables.
+  - Evidence: `core/config.py::load_api_key` reads the configured environment variable; `interfaces/cli.py` passes it to the provider.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No secrets are hardcoded in source files.
+  - Evidence: Source review shows only placeholder/fake test values; real API keys are loaded from `GEMINI_API_KEY`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `session_history_max_messages` is explicit and defaults to 10.
+  - Evidence: `config/settings.toml` sets `session_history_max_messages = 10`; config loading test asserts this value.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `max_user_input_chars` is explicit and defaults to 8,000.
+  - Evidence: `config/settings.toml` sets `max_user_input_chars = 8000`; config loading test asserts this value.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `provider_timeout_seconds` is explicit and defaults to 30.
+  - Evidence: `config/settings.toml` sets `provider_timeout_seconds = 30`; provider test asserts it is sent as 30000 milliseconds.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing config produces a clear startup error.
+  - Evidence: Non-live startup check returned `Startup error: Missing config file: missing-settings-for-verification.toml`; unit test covers missing config.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Invalid config produces a clear startup error.
+  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_values` verifies invalid values raise `ConfigurationError` with specific messages.
+  - Date: 2026-07-08
+  - Notes: `interfaces/cli.py::run` catches `AssistantError` and prints startup errors.
+- [x] Missing prompt file produces a clear startup error.
+  - Evidence: `tests/test_cli.py::test_run_reports_missing_prompt_file_startup_error`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing API key produces a clear startup error.
+  - Evidence: Non-live startup check returned `Startup error: Missing required environment variable: GEMINI_API_KEY`; unit test covers missing API key.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Config defaults are explicit and documented.
+  - Evidence: Defaults are listed in `config/settings.toml` and README Configuration section.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No silent fallback hides unsafe or invalid configuration.
+  - Evidence: `core/config.py` requires non-empty strings, positive integers, supported thinking levels, and `provider_name = "gemini"`.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 4. Core Assistant Behavior
 
-- [ ] Assistant starts from the documented command.
-- [ ] Assistant accepts normal text input.
-- [ ] Assistant rejects or ignores empty input cleanly.
-- [ ] Assistant rejects or handles input over 8,000 characters cleanly.
-- [ ] Assistant sends valid input to the configured provider.
-- [ ] Assistant prints a clear text response.
-- [ ] Assistant keeps bounded session history during the current run.
-- [ ] Assistant retains no more than the last 10 conversation messages, excluding the system prompt.
-- [ ] Session history is passed consistently to the provider when expected.
-- [ ] Assistant handles multiple prompts in one run.
-- [ ] Assistant exits cleanly on `/exit`.
-- [ ] Assistant exits cleanly on `/quit`.
-- [ ] Assistant exits cleanly on keyboard interrupt.
-- [ ] Assistant does not expose internal stack traces during normal user-facing failures.
+- [x] Assistant starts from the documented command.
+  - Evidence: README documents `python main.py`; `main.py` calls `interfaces.cli.run`; user reported live `python main.py` runs.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant accepts normal text input.
+  - Evidence: `tests/test_assistant.py::test_assistant_request_flow_updates_session_and_logs_success`; user reported live prompts and replies.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant rejects or ignores empty input cleanly.
+  - Evidence: `tests/test_safety.py::test_validate_user_input_rejects_empty_text`; `interfaces/cli.py` catches `InputValidationError` and continues.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant rejects or handles input over 8,000 characters cleanly.
+  - Evidence: `tests/test_safety.py::test_validate_user_input_rejects_too_long_text`; default limit is configured at 8,000.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant sends valid input to the configured provider.
+  - Evidence: `core/assistant.py` calls `provider.generate_response`; assistant request-flow test verifies provider call content and timeout.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant prints a clear text response.
+  - Evidence: `interfaces/cli.py` prints `reply.text`; user reported live text responses.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant keeps bounded session history during the current run.
+  - Evidence: `core/session.py` maintains in-memory messages with a configured max; session tests cover storage and truncation.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant retains no more than the last 10 conversation messages, excluding the system prompt.
+  - Evidence: `Session(max_messages=10)` is wired from config; `tests/test_session.py::test_session_truncates_to_last_10_messages`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Session history is passed consistently to the provider when expected.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config` verifies user/model role conversion and message order.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant handles multiple prompts in one run.
+  - Evidence: `interfaces/cli.py::run_loop` continues after successful responses and handled validation/provider errors; user reported a 4-message live run.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant exits cleanly on `/exit`.
+  - Evidence: `tests/test_cli.py::test_run_loop_exits_on_exit_command`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant exits cleanly on `/quit`.
+  - Evidence: `tests/test_cli.py::test_run_loop_exits_on_quit_command`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant exits cleanly on keyboard interrupt.
+  - Evidence: `tests/test_cli.py::test_run_loop_exits_cleanly_on_keyboard_interrupt`; user-reported manual keyboard interrupt test passed.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Assistant does not expose internal stack traces during normal user-facing failures.
+  - Evidence: `interfaces/cli.py` catches startup, input validation, and provider errors and prints user-facing messages; tests cover startup and shutdown paths.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 5. Provider Behavior
 
-- [ ] Exactly one LLM provider is configured for Phase 1.
-- [ ] Provider interface is abstracted enough to fake in tests.
-- [ ] Provider implementation has no CLI behavior.
-- [ ] Provider success path is tested.
-- [ ] Provider timeout is configured explicitly and defaults to 30 seconds.
-- [ ] Provider timeout path is tested or manually simulated.
-- [ ] Provider authentication failure path is tested or manually simulated.
-- [ ] Provider rate-limit path is tested or manually simulated.
-- [ ] Provider unavailable path is tested or manually simulated.
-- [ ] Provider errors become clear user-facing messages.
-- [ ] Provider errors are logged without leaking secrets.
-- [ ] No automated test requires a live API key.
+- [x] Exactly one LLM provider is configured for Phase 1.
+  - Evidence: `config/settings.toml` sets `provider_name = "gemini"`; `core/config.py` rejects any other provider.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider interface is abstracted enough to fake in tests.
+  - Evidence: `providers/base.py` defines `LLMProvider`; assistant tests use `FakeProvider` and `FailingProvider`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider implementation has no CLI behavior.
+  - Evidence: `providers/gemini_provider.py` exposes provider request/error mapping only; CLI behavior is isolated in `interfaces/cli.py`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider success path is tested.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider timeout is configured explicitly and defaults to 30 seconds.
+  - Evidence: `config/settings.toml` sets `provider_timeout_seconds = 30`; provider test asserts `http_options.timeout == 30000`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider timeout path is tested or manually simulated.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_maps_socket_timeout` and status `408`/`504` mapping tests.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider authentication failure path is tested or manually simulated.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_maps_provider_error_statuses` covers `401` and `403`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider rate-limit path is tested or manually simulated.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_maps_provider_error_statuses` covers `429`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider unavailable path is tested or manually simulated.
+  - Evidence: Provider tests cover empty responses and `500`; user observed a clear live `500 INTERNAL` provider failure.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider errors become clear user-facing messages.
+  - Evidence: `providers/gemini_provider.py::_map_provider_exception` maps provider failures to specific `ProviderError` subclasses/messages; CLI catches `ProviderError`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider errors are logged without leaking secrets.
+  - Evidence: `core/assistant.py` logs provider failures by error type only; provider and logger redaction tests cover API-key-shaped text.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No automated test requires a live API key.
+  - Evidence: Provider tests inject fake clients and fake API key strings; full test suite passed without a real API key.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 6. Logging
 
-- [ ] Each interaction logs a timestamp.
-- [ ] Each interaction logs a session ID.
-- [ ] Each interaction logs the user input.
-- [ ] Each interaction logs the assistant response when available.
-- [ ] Each interaction logs the provider name.
-- [ ] Each interaction logs success or failure state.
-- [ ] Failures log an error type.
-- [ ] Logs are local only.
-- [ ] Logs use JSONL.
-- [ ] Logs contain one complete interaction per line.
-- [ ] Each generated JSONL line is parseable as JSON.
-- [ ] Logs are written in a reviewable local format.
-- [ ] Log write failure is handled cleanly.
-- [ ] Logs do not include API keys.
-- [ ] Logs do not include raw environment dumps.
-- [ ] Logs do not include unnecessary system information.
-- [ ] Logs are not sent to an external logging service.
-- [ ] Logs may include conversation text in Phase 1, and this is documented clearly.
-- [ ] A generated log file has been manually inspected.
+- [x] Each interaction logs a timestamp.
+  - Evidence: `core/logging.py` writes `timestamp`; logging test parses the record.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each interaction logs a session ID.
+  - Evidence: `core/logging.py` writes `session_id`; logging test asserts `session-1`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each interaction logs the user input.
+  - Evidence: `core/logging.py` writes redacted `user_input`; logging test asserts the value.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each interaction logs the assistant response when available.
+  - Evidence: `core/logging.py` writes redacted `assistant_response`; logging test asserts the value.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each interaction logs the provider name.
+  - Evidence: `core/logging.py` writes `provider_name`; logging test asserts `gemini`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each interaction logs success or failure state.
+  - Evidence: `core/logging.py` writes `success`; assistant tests cover success and provider failure records.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Failures log an error type.
+  - Evidence: `core/assistant.py` logs `error_type`; provider failure test asserts `ProviderUnavailableError`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are local only.
+  - Evidence: `InteractionLogger` writes to a local `Path`; README documents local JSONL logs.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs use JSONL.
+  - Evidence: `core/logging.py` appends one JSON object plus newline; logging test parses the line.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs contain one complete interaction per line.
+  - Evidence: `core/logging.py` writes one record per `log_interaction` call; logging test verifies one line for one interaction.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Each generated JSONL line is parseable as JSON.
+  - Evidence: Logging tests parse generated records with `json.loads`; local log inspection parsed 12 records.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are written in a reviewable local format.
+  - Evidence: Local log inspection parsed `logs/interactions.jsonl` as JSONL.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Log write failure is handled cleanly.
+  - Evidence: `InteractionLogger` raises `LogWriteError`; `Assistant._try_log` returns the user-facing log error instead of crashing; tests cover logging failure on direct logger use, successful provider replies, and provider-error replies.
+  - Date: 2026-07-09
+  - Notes: Provider-error plus log-write failure now surfaces both the provider error and the log-write error through the CLI.
+- [x] Logs do not include API keys.
+  - Evidence: Logger redacts configured secrets and Google API-key-shaped text; tests cover both paths; local log inspection found zero API-key-shaped leaks.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs do not include raw environment dumps.
+  - Evidence: Log record fields are fixed in `core/logging.py` and do not include environment variables.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs do not include unnecessary system information.
+  - Evidence: Log record fields are limited to timestamp, session ID, conversation fields, provider name, success state, and error type.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are not sent to an external logging service.
+  - Evidence: `InteractionLogger` only writes to the local filesystem path.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs may include conversation text in Phase 1, and this is documented clearly.
+  - Evidence: README Logging section documents conversation-text logging and API-key redaction limits.
+  - Date: 2026-07-08
+  - Notes:
+- [x] A generated log file has been manually inspected.
+  - Evidence: `logs/interactions.jsonl` inspection found 12 parseable JSONL records and zero Google API-key-shaped leaks.
+  - Date: 2026-07-08
+  - Notes: Conversation text was not printed during inspection.
 
 ## 7. Error Handling
 
-- [ ] Missing config file handled cleanly.
-- [ ] Invalid config value handled cleanly.
-- [ ] Missing API key handled cleanly.
-- [ ] Empty input handled cleanly.
-- [ ] Input over 8,000 characters handled cleanly.
-- [ ] Provider timeout handled cleanly.
-- [ ] Provider authentication failure handled cleanly.
-- [ ] Provider rate limit handled cleanly.
-- [ ] Provider unavailable handled cleanly.
-- [ ] Keyboard interrupt handled cleanly.
-- [ ] Log write failure handled cleanly.
-- [ ] User-facing error messages are specific enough to act on.
-- [ ] User-facing error messages do not expose secrets.
+- [x] Missing config file handled cleanly.
+  - Evidence: Non-live startup check returned exit code 1 and a clear missing-config startup error; unit test covers missing config.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Invalid config value handled cleanly.
+  - Evidence: Config tests cover invalid provider, model, timeout, thinking level, retry count, history limit, and input limit.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing API key handled cleanly.
+  - Evidence: Non-live startup check returned exit code 1 and a clear missing-API-key startup error; unit test covers missing key.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Empty input handled cleanly.
+  - Evidence: `validate_user_input` raises a user-facing `InputValidationError`; CLI catches it and continues.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Input over 8,000 characters handled cleanly.
+  - Evidence: Input length test verifies over-limit input raises `InputValidationError`; CLI catches it and continues.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider timeout handled cleanly.
+  - Evidence: Provider timeout tests map timeout cases to `ProviderTimeoutError`; CLI catches `ProviderError`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider authentication failure handled cleanly.
+  - Evidence: Provider status mapping tests cover `401` and `403` as `ProviderAuthenticationError`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider rate limit handled cleanly.
+  - Evidence: Provider status mapping test covers `429` as `ProviderRateLimitError`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider unavailable handled cleanly.
+  - Evidence: Assistant provider-failure test and provider unavailable status/empty-response tests pass; user observed a clear live `500` error message.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Keyboard interrupt handled cleanly.
+  - Evidence: CLI keyboard interrupt test passes; user-reported manual keyboard interrupt test passed.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Log write failure handled cleanly.
+  - Evidence: Logging failure tests cover `LogWriteError`, successful provider replies, provider-error replies, and CLI output of attached log-write failures.
+  - Date: 2026-07-09
+  - Notes:
+- [x] User-facing error messages are specific enough to act on.
+  - Evidence: Startup, config, validation, provider auth, rate-limit, timeout, and unavailable messages are specific in `core/errors.py`, `core/config.py`, `core/safety.py`, and `providers/gemini_provider.py`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] User-facing error messages do not expose secrets.
+  - Evidence: Provider exception details and logger fields redact API-key-shaped text; missing-key message names the env var but not the secret value.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 8. Automated Tests
 
-- [ ] Test suite runs from the documented command.
-- [ ] Assistant request flow is tested.
-- [ ] Session history behavior is tested.
-- [ ] Session history truncation at 10 conversation messages is tested.
-- [ ] Input validation is tested.
-- [ ] Input length validation is tested.
-- [ ] Config loading is tested.
-- [ ] Missing config behavior is tested.
-- [ ] Invalid config behavior is tested.
-- [ ] Missing API key behavior is tested.
-- [ ] Prompt loading is tested.
-- [ ] `/exit` command behavior is tested.
-- [ ] `/quit` command behavior is tested.
-- [ ] Provider success is tested with a fake or mock.
-- [ ] Provider failure is tested with a fake or mock.
-- [ ] Provider timeout configuration is tested.
-- [ ] Logging success is tested.
-- [ ] Logging failure is tested.
-- [ ] JSONL log formatting is tested.
-- [ ] Graceful shutdown paths are tested where practical.
-- [ ] Tests do not depend on execution order.
-- [ ] Tests do not depend on a real API key.
-- [ ] Tests do not make live network calls by default.
-- [ ] All tests pass.
+- [x] Test suite runs from the documented command.
+  - Evidence: `python -m unittest discover -s tests` ran successfully; 32 tests passed.
+  - Date: 2026-07-08
+  - Notes: This matches the README test command.
+- [x] Assistant request flow is tested.
+  - Evidence: `tests/test_assistant.py::test_assistant_request_flow_updates_session_and_logs_success`.
+  - Date: 2026-07-08
+  - Notes: Uses a fake provider; no live network call.
+- [x] Session history behavior is tested.
+  - Evidence: `tests/test_session.py::test_add_stores_messages`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Session history truncation at 10 conversation messages is tested.
+  - Evidence: `tests/test_session.py::test_session_truncates_to_last_10_messages`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Input validation is tested.
+  - Evidence: `tests/test_safety.py::test_validate_user_input_accepts_text` and `test_validate_user_input_rejects_empty_text`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Input length validation is tested.
+  - Evidence: `tests/test_safety.py::test_validate_user_input_rejects_too_long_text`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Config loading is tested.
+  - Evidence: `tests/test_config.py::test_load_config_reads_required_values`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing config behavior is tested.
+  - Evidence: `tests/test_config.py::test_load_config_rejects_missing_file`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Invalid config behavior is tested.
+  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_integer` and `test_load_config_rejects_invalid_values`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing API key behavior is tested.
+  - Evidence: `tests/test_config.py::test_load_api_key_rejects_missing_environment_variable`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Prompt loading is tested.
+  - Evidence: `tests/test_config.py::test_load_system_prompt_reads_text` and `test_load_system_prompt_rejects_missing_file`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `/exit` command behavior is tested.
+  - Evidence: `tests/test_cli.py::test_run_loop_exits_on_exit_command`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `/quit` command behavior is tested.
+  - Evidence: `tests/test_cli.py::test_run_loop_exits_on_quit_command`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider success is tested with a fake or mock.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider failure is tested with a fake or mock.
+  - Evidence: `tests/test_assistant.py::test_assistant_logs_provider_failure_without_updating_session` and provider status mapping tests.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider timeout configuration is tested.
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config` asserts `http_options.timeout == 30000`.
+  - Date: 2026-07-08
+  - Notes: 30 seconds is converted to milliseconds for the provider SDK.
+- [x] Logging success is tested.
+  - Evidence: `tests/test_logging.py::test_log_interaction_writes_jsonl_record`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logging failure is tested.
+  - Evidence: `tests/test_logging.py::test_log_interaction_reports_write_failure`, `tests/test_assistant.py::test_assistant_attaches_log_failure_to_provider_error`, and `tests/test_cli.py::test_run_loop_prints_log_failure_after_provider_error`.
+  - Date: 2026-07-09
+  - Notes:
+- [x] JSONL log formatting is tested.
+  - Evidence: `tests/test_logging.py::test_log_interaction_writes_jsonl_record` parses the written line with `json.loads`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Graceful shutdown paths are tested where practical.
+  - Evidence: `tests/test_cli.py` covers `/exit`, `/quit`, and keyboard interrupt.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Tests do not depend on execution order.
+  - Evidence: Full discovery run passed with `python -m unittest discover -s tests`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Tests do not depend on a real API key.
+  - Evidence: Tests use fakes, mocks, and patched environment variables; full test run passed without requiring a real key.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Tests do not make live network calls by default.
+  - Evidence: Provider tests inject fake clients; assistant tests inject fake providers; full test run passed without live provider access.
+  - Date: 2026-07-08
+  - Notes:
+- [x] All tests pass.
+  - Evidence: `python -m unittest discover -s tests` returned OK; 34 tests passed.
+  - Date: 2026-07-09
+  - Notes:
 
 ## 9. Static Validation
 
-- [ ] Formatting command has been run, if configured.
-- [ ] Linting command has been run.
-- [ ] Linting passes.
-- [ ] Type checking has been run if configured.
-- [ ] Type checking passes if configured.
-- [ ] Dependency list has been reviewed.
-- [ ] No unapproved runtime dependency was added.
-- [ ] No unapproved development dependency was added.
-- [ ] Import structure has been reviewed for obvious circular dependencies.
+- [x] Formatting command has been run, if configured.
+  - Evidence: `.\.venv\Scripts\python.exe -m ruff format --check .` passed after `ruff format core\config.py core\safety.py`.
+  - Date: 2026-07-08
+  - Notes: Ruff reported `20 files already formatted`.
+- [x] Linting command has been run.
+  - Evidence: `.\.venv\Scripts\python.exe -m ruff check .`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Linting passes.
+  - Evidence: Ruff returned `All checks passed!`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Type checking has been run if configured.
+  - Evidence: `pyproject.toml` was reviewed; no type checker is configured and `mypy` is not listed as a dependency.
+  - Date: 2026-07-08
+  - Notes: Not applicable for the current Phase 1 scaffold.
+- [x] Type checking passes if configured.
+  - Evidence: No type checker is configured in `pyproject.toml`.
+  - Date: 2026-07-08
+  - Notes: Not applicable for the current Phase 1 scaffold.
+- [x] Dependency list has been reviewed.
+  - Evidence: `pyproject.toml` reviewed.
+  - Date: 2026-07-08
+  - Notes: Runtime dependency is `google-genai`; development dependency is `ruff`.
+- [x] No unapproved runtime dependency was added.
+  - Evidence: `pyproject.toml` lists only `google-genai>=1.0,<2.0` as the runtime dependency.
+  - Date: 2026-07-08
+  - Notes: This matches the Phase 1 allowance for one official LLM client package.
+- [x] No unapproved development dependency was added.
+  - Evidence: `pyproject.toml` lists only `ruff>=0.8,<1` under `dev`.
+  - Date: 2026-07-08
+  - Notes: Ruff is an allowed development dependency.
+- [x] Import structure has been reviewed for obvious circular dependencies.
+  - Evidence: Source files in `core/`, `interfaces/`, and `providers/` were read; full test import run and Ruff checks passed.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 10. Manual Verification
 
-- [ ] Fresh setup was performed from the README instructions.
-- [ ] Virtual environment creation works as documented.
-- [ ] Dependency installation works as documented.
-- [ ] Valid config starts the assistant successfully.
-- [ ] Missing config fails clearly.
-- [ ] Invalid config fails clearly.
-- [ ] Missing API key fails clearly.
-- [ ] Normal prompt and response works.
-- [ ] Empty input is handled cleanly.
-- [ ] Input over 8,000 characters is handled cleanly.
-- [ ] Multi-turn session behaves as expected.
-- [ ] Session history remains bounded to the last 10 conversation messages.
-- [ ] `/exit` exits cleanly.
-- [ ] `/quit` exits cleanly.
-- [ ] Logs are created.
-- [ ] Logs are JSONL.
-- [ ] Logs are local only.
-- [ ] Logs are reviewable.
-- [ ] Logs do not contain secrets.
-- [ ] Logs may contain conversation text, and this is documented clearly.
-- [ ] Keyboard interrupt exits cleanly.
-- [ ] Provider failure produces a useful error.
-- [ ] Provider timeout uses the configured timeout, defaulting to 30 seconds.
-- [ ] README commands match actual commands.
-- [ ] README limitations match actual Phase 1 limits.
+- [x] Fresh setup was performed from the README instructions.
+  - Evidence: User confirmed fresh setup from the README instructions was performed successfully.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Virtual environment creation works as documented.
+  - Evidence: User confirmed virtual environment creation works as documented; current commands are being run from `.venv`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Dependency installation works as documented.
+  - Evidence: User confirmed dependency installation works as documented; installed dependencies support live provider use and Ruff validation.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Valid config starts the assistant successfully.
+  - Evidence: `python -c "... build_assistant() ..."` with a fake `GEMINI_API_KEY` returned `assistant=Assistant provider=gemini`.
+  - Date: 2026-07-08
+  - Notes: This was a non-live startup check and did not contact Gemini.
+- [x] Missing config fails clearly.
+  - Evidence: `python -c "... run(Path('missing-settings-for-verification.toml')) ..."` returned `exit_code=1` and `Startup error: Missing config file: missing-settings-for-verification.toml`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Invalid config fails clearly.
+  - Evidence: User manually tested an invalid config and confirmed it failed clearly.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Missing API key fails clearly.
+  - Evidence: `python -c "... patch.dict('os.environ', {}, clear=True) ... run() ..."` returned `exit_code=1` and `Startup error: Missing required environment variable: GEMINI_API_KEY`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Normal prompt and response works.
+  - Evidence: User-reported live manual run with `python main.py`: prompts returned assistant replies, including four successful send/reply cycles after retry handling was added.
+  - Date: 2026-07-08
+  - Notes: Live provider behavior depends on Gemini availability and quota.
+- [x] Empty input is handled cleanly.
+  - Evidence: User confirmed manual empty-input behavior can be marked complete; automated validation also covers empty input rejection.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Input over 8,000 characters is handled cleanly.
+  - Evidence: User manually tested over-8,000-character input and confirmed it was handled cleanly.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Multi-turn session behaves as expected.
+  - Evidence: User-reported live manual run sent 4 messages and received 4 replies with no logged errors.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Session history remains bounded to the last 10 conversation messages.
+  - Evidence: User manually tested bounded session history and confirmed it remains limited to the last 10 conversation messages.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `/exit` exits cleanly.
+  - Evidence: User confirmed `/exit` manual behavior can be marked complete; automated CLI test also covers `/exit`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `/quit` exits cleanly.
+  - Evidence: User confirmed `/quit` manual behavior can be marked complete; automated CLI test also covers `/quit`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are created.
+  - Evidence: Local inspection command reported `logs/interactions.jsonl` exists with 12 lines.
+  - Date: 2026-07-08
+  - Notes: Conversation text was not printed during inspection.
+- [x] Logs are JSONL.
+  - Evidence: Local inspection parsed 12 lines from `logs/interactions.jsonl` as 12 JSON records.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are local only.
+  - Evidence: Code inspection shows `InteractionLogger` writes to `config.log_file` on the local filesystem; README documents local JSONL logging.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are reviewable.
+  - Evidence: Local inspection parsed `logs/interactions.jsonl` successfully as JSONL.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs do not contain secrets.
+  - Evidence: Local inspection found `api_key_like_leaks=0`; automated tests cover configured-secret and Google API-key-shaped redaction.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs may contain conversation text, and this is documented clearly.
+  - Evidence: README Logging section documents that Phase 1 logs may include conversation text and describes API-key redaction limits.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Keyboard interrupt exits cleanly.
+  - Evidence: User-reported manual keyboard interrupt test passed; `tests/test_cli.py::test_run_loop_exits_cleanly_on_keyboard_interrupt` also passes.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider failure produces a useful error.
+  - Evidence: User observed `Gemini provider request failed with status 500: 500 INTERNAL...`; provider error mapping tests cover status-specific user-facing errors.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Provider timeout uses the configured timeout, defaulting to 30 seconds.
+  - Evidence: Provider test asserts timeout config is sent as `30000` milliseconds; `config/settings.toml` sets `provider_timeout_seconds = 30`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README commands match actual commands.
+  - Evidence: README reviewed; documented `python -m unittest discover -s tests` and Ruff commands were run successfully.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README limitations match actual Phase 1 limits.
+  - Evidence: README reviewed against `PHASE_1.md`; listed out-of-scope items match the Phase 1 contract.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 11. Documentation
 
-- [ ] README explains what the assistant does.
-- [ ] README explains what the assistant does not do.
-- [ ] README includes setup instructions.
-- [ ] README includes configuration instructions.
-- [ ] README documents the default session history limit of 10 conversation messages.
-- [ ] README documents the default maximum input length of 8,000 characters.
-- [ ] README documents the default provider timeout of 30 seconds.
-- [ ] README documents `/exit` and `/quit`.
-- [ ] README explains required environment variables.
-- [ ] README includes run instructions.
-- [ ] README includes test instructions.
-- [ ] README includes troubleshooting notes.
-- [ ] README documents that logs are local JSONL files.
-- [ ] README documents that Phase 1 logs may include conversation text.
-- [ ] README documents that logs must never include secrets.
-- [ ] README references `PHASE_1.md`.
-- [ ] README references this exit criteria document.
-- [ ] `AGENTS.md` exists and enforces Phase 1 boundaries.
-- [ ] Documentation has been checked against current behavior.
+- [x] README explains what the assistant does.
+  - Evidence: README `What It Does` section reviewed.
+  - Date: 2026-07-08
+  - Notes: It describes config loading, prompt loading, environment-secret loading, CLI input, bounded session history, local JSONL logs, and graceful exits.
+- [x] README explains what the assistant does not do.
+  - Evidence: README `What It Does Not Do` section reviewed against `PHASE_1.md`.
+  - Date: 2026-07-08
+  - Notes: Listed exclusions match the Phase 1 out-of-scope boundary.
+- [x] README includes setup instructions.
+  - Evidence: README `Setup` section documents virtual environment creation, activation, and editable install.
+  - Date: 2026-07-08
+  - Notes: User confirmed fresh setup, virtual environment creation, and dependency installation worked from the README instructions.
+- [x] README includes configuration instructions.
+  - Evidence: README `Configuration` section reviewed.
+  - Date: 2026-07-08
+  - Notes: It documents `config/settings.toml`, the API-key environment variable, defaults, model, thinking level, and retry behavior.
+- [x] README documents the default session history limit of 10 conversation messages.
+  - Evidence: README `Configuration` section lists `session_history_max_messages = 10`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README documents the default maximum input length of 8,000 characters.
+  - Evidence: README `Configuration` section lists `max_user_input_chars = 8000`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README documents the default provider timeout of 30 seconds.
+  - Evidence: README `Configuration` section lists `provider_timeout_seconds = 30`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README documents `/exit` and `/quit`.
+  - Evidence: README `Configuration` and `What It Does` sections mention `/exit` and `/quit`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README explains required environment variables.
+  - Evidence: README `Configuration` section documents `GEMINI_API_KEY` and shows a placeholder PowerShell example.
+  - Date: 2026-07-08
+  - Notes: The example uses a placeholder, not a real key.
+- [x] README includes run instructions.
+  - Evidence: README `Run` section documents `python main.py`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README includes test instructions.
+  - Evidence: README `Test` section documents `python -m unittest discover -s tests` and optional Ruff linting.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README includes troubleshooting notes.
+  - Evidence: README `Troubleshooting` section reviewed.
+  - Date: 2026-07-08
+  - Notes: It covers missing config, missing prompt, missing API key, invalid config, auth, rate limit, timeout, and provider unavailability.
+- [x] README documents that logs are local JSONL files.
+  - Evidence: README `Logging` section says runtime logs are written locally as JSONL to `logs/interactions.jsonl` by default.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README documents that Phase 1 logs may include conversation text.
+  - Evidence: README `Logging` section explicitly states that Phase 1 logs may include conversation text.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README documents that logs must never include secrets.
+  - Evidence: README `Logging` section states logs must never include API keys, raw environment dumps, or unnecessary system information.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README references `PHASE_1.md`.
+  - Evidence: README opening section and `Phase 1 Exit` section reference `PHASE_1.md`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] README references this exit criteria document.
+  - Evidence: README opening section and `Phase 1 Exit` section reference `PHASE_1_EXIT_CRITERIA.md`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `AGENTS.md` exists and enforces Phase 1 boundaries.
+  - Evidence: `AGENTS.md` was re-read and requires Phase 1 scope control, architecture boundaries, dependency limits, and no Phase 2 work.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Documentation has been checked against current behavior.
+  - Evidence: README reviewed against `PHASE_1.md`, `config/settings.toml`, `.gitignore`, `interfaces/cli.py`, `core/logging.py`, and `providers/gemini_provider.py`.
+  - Date: 2026-07-08
+  - Notes: Documented commands, defaults, logging behavior, and limitations match current implementation.
 
 ## 12. Security And Privacy
 
-- [ ] Secrets are never committed.
-- [ ] Example config files contain placeholders only.
-- [ ] `.gitignore` excludes local secrets and runtime logs where appropriate.
-- [ ] Error messages do not print API keys.
-- [ ] Logs do not print API keys.
-- [ ] Logs are local only.
-- [ ] Logs use JSONL.
-- [ ] Phase 1 conversation-text logging is clearly documented.
-- [ ] Tests do not require real secrets.
-- [ ] No unnecessary personal data is collected.
-- [ ] No external service is contacted except the configured LLM provider during normal live use.
-- [ ] No external logging service is contacted during normal use.
+- [x] Secrets are never committed.
+  - Evidence: Source/config/docs were reviewed for hardcoded secrets; `rg --count-matches "AIza[0-9A-Za-z_-]{20,}" -g "!logs/**" -g "!*.jsonl" .` returned no matches.
+  - Date: 2026-07-08
+  - Notes: No commit was made during Phase 1 checklist work; real API keys are loaded from environment variables.
+- [x] Example config files contain placeholders only.
+  - Evidence: `config/settings.toml` contains only the environment variable name `GEMINI_API_KEY`; README uses `"replace-with-your-real-key"` as the setup placeholder.
+  - Date: 2026-07-08
+  - Notes:
+- [x] `.gitignore` excludes local secrets and runtime logs where appropriate.
+  - Evidence: `.gitignore` excludes `.env`, `.env.*`, `*.key`, `*.pem`, local config overrides, and `logs/*` while preserving `logs/.gitkeep`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Error messages do not print API keys.
+  - Evidence: `providers/gemini_provider.py::_safe_exception_message` redacts the configured API key and Google API-key-shaped strings; missing-key errors name only the required environment variable.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs do not print API keys.
+  - Evidence: `InteractionLogger` redacts configured secrets and Google API-key-shaped strings; automated logger tests cover redaction and local log inspection found zero API-key-shaped leaks.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs are local only.
+  - Evidence: `InteractionLogger` writes to a local `Path`; `config/settings.toml` points to `logs/interactions.jsonl`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Logs use JSONL.
+  - Evidence: `core/logging.py` appends one JSON object plus newline per interaction; tests parse generated records with `json.loads`.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Phase 1 conversation-text logging is clearly documented.
+  - Evidence: README `Logging` section states that Phase 1 logs may include conversation text.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Tests do not require real secrets.
+  - Evidence: Tests use fake providers, fake clients, and patched environment variables; full test suite passed without a real API key.
+  - Date: 2026-07-08
+  - Notes:
+- [x] No unnecessary personal data is collected.
+  - Evidence: Log records are limited to timestamp, session ID, conversation fields, provider name, success state, and error type.
+  - Date: 2026-07-08
+  - Notes: Conversation text logging is a documented Phase 1 behavior.
+- [x] No external service is contacted except the configured LLM provider during normal live use.
+  - Evidence: Source review shows the only live external client path is `GeminiProvider` creating `google.genai.Client` for configured provider requests.
+  - Date: 2026-07-08
+  - Notes: Automated tests inject fakes and do not make live provider calls.
+- [x] No external logging service is contacted during normal use.
+  - Evidence: `InteractionLogger` writes only to the local filesystem and no external logging dependency or client exists.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 13. Reliability Review
 
-- [ ] The assistant can run more than one prompt in a single session.
-- [ ] The assistant can recover from a provider error and continue when appropriate.
-- [ ] The assistant can exit without corrupting logs.
-- [ ] The assistant behaves predictably with whitespace-only input.
-- [ ] The assistant behaves predictably with unusually long input within configured limits.
-- [ ] The assistant rejects or handles input over 8,000 characters predictably.
-- [ ] The assistant has a clear session history limit of 10 conversation messages.
-- [ ] The assistant has a clear user input limit of 8,000 characters.
-- [ ] Failure behavior has been reviewed manually.
+- [x] The assistant can run more than one prompt in a single session.
+  - Evidence: User reported a live `python main.py` run with 4 messages sent and 4 replies received.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant can recover from a provider error and continue when appropriate.
+  - Evidence: User observed a clear transient Gemini `500 INTERNAL` provider error; later live testing sent 4 messages and received 4 replies after provider-local retry handling was added.
+  - Date: 2026-07-08
+  - Notes: CLI catches provider errors and continues the input loop when appropriate.
+- [x] The assistant can exit without corrupting logs.
+  - Evidence: User confirmed `/exit` and `/quit` manual checks passed; local log inspection parsed all 12 lines as valid JSONL records.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant behaves predictably with whitespace-only input.
+  - Evidence: User confirmed empty input is handled cleanly; `validate_user_input` strips whitespace and raises `InputValidationError` for empty text.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant behaves predictably with unusually long input within configured limits.
+  - Evidence: User confirmed Section 13 reliability testing is complete; code inspection shows inputs at or below `max_user_input_chars` are accepted after stripping.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant rejects or handles input over 8,000 characters predictably.
+  - Evidence: User manually tested over-8,000-character input and confirmed it was handled cleanly; automated input length validation test covers this path.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant has a clear session history limit of 10 conversation messages.
+  - Evidence: `config/settings.toml` sets `session_history_max_messages = 10`; user manually tested bounded session history; automated session truncation test covers the limit.
+  - Date: 2026-07-08
+  - Notes:
+- [x] The assistant has a clear user input limit of 8,000 characters.
+  - Evidence: `config/settings.toml` sets `max_user_input_chars = 8000`; README documents the limit; validation tests cover over-limit input.
+  - Date: 2026-07-08
+  - Notes:
+- [x] Failure behavior has been reviewed manually.
+  - Evidence: User manually verified invalid config, over-limit input, keyboard interrupt, provider failure, exit commands, empty input, and bounded session history.
+  - Date: 2026-07-08
+  - Notes:
 
 ## 14. Final Review
 
-- [ ] `PHASE_1.md` and implementation agree.
-- [ ] `PHASE_1_EXIT_CRITERIA.md` is fully checked or documented.
-- [ ] `AGENTS.md` reflects the current Phase 1 rules.
-- [ ] README accurately explains the current project.
-- [ ] No obvious dead code remains.
-- [ ] No temporary debug prints remain.
-- [ ] No test-only shortcuts are present in production code.
-- [ ] No local-only absolute paths are required for normal use.
-- [ ] The full validation command set has been run.
-- [ ] Final manual smoke test has been run.
+- [x] `PHASE_1.md` and implementation agree.
+  - Evidence: `PHASE_1.md` was re-read and checked against `main.py`, `config/`, `core/`, `interfaces/`, `providers/`, tests, README, and `pyproject.toml`.
+  - Date: 2026-07-09
+  - Notes: Implementation remains CLI-only, text-only, one Gemini provider, local config, env-secret loading, bounded in-memory session history, and local JSONL logging.
+- [x] `PHASE_1_EXIT_CRITERIA.md` is fully checked or documented.
+  - Evidence: Sections 1 through 14 are checked; Phase 1 Exit Decision is approved; no waived items are required.
+  - Date: 2026-07-10
+  - Notes:
+- [x] `AGENTS.md` reflects the current Phase 1 rules.
+  - Evidence: `AGENTS.md` was re-read and still requires Phase 1 scope limits, architecture boundaries, dependency limits, safety rules, verification, and no Phase 2 work.
+  - Date: 2026-07-09
+  - Notes:
+- [x] README accurately explains the current project.
+  - Evidence: README was checked against `PHASE_1.md`, `config/settings.toml`, `interfaces/cli.py`, `core/logging.py`, and `providers/gemini_provider.py`.
+  - Date: 2026-07-09
+  - Notes: README matches current setup, config defaults, run/test commands, logging behavior, troubleshooting, and Phase 1 limitations.
+- [x] No obvious dead code remains.
+  - Evidence: Production modules in `main.py`, `core/`, `interfaces/`, and `providers/` were reviewed; Ruff check passed.
+  - Date: 2026-07-09
+  - Notes:
+- [x] No temporary debug prints remain.
+  - Evidence: `rg -n "TODO|FIXME|XXX|HACK|debug|breakpoint\(|pdb|print\(" . -g "!logs/**" -g "!*.jsonl" -g "!.venv/**" -g "!.git/**" -g "!.ruff_cache/**"` found only documentation uses of "debug" and intentional CLI `print` calls.
+  - Date: 2026-07-09
+  - Notes:
+- [x] No test-only shortcuts are present in production code.
+  - Evidence: Production code was reviewed; `rg -n "fake|mock|test_|unittest|fixture|patch\.dict" main.py core interfaces providers config -g "*.py"` returned no matches.
+  - Date: 2026-07-09
+  - Notes: Tests use fakes/mocks, but production code does not.
+- [x] No local-only absolute paths are required for normal use.
+  - Evidence: Config uses relative paths by default; `rg -n "D:\\|C:\\|/home/|/Users/" . -g "!logs/**" -g "!*.jsonl" -g "!.venv/**" -g "!.git/**" -g "!.ruff_cache/**"` returned no matches.
+  - Date: 2026-07-09
+  - Notes:
+- [x] The full validation command set has been run.
+  - Evidence: `python -m unittest discover -s tests`, `.\.venv\Scripts\python.exe -m ruff check .`, `.\.venv\Scripts\python.exe -m ruff format --check .`, and `git diff --check` all exited successfully.
+  - Date: 2026-07-09
+  - Notes: Type checking is not configured in `pyproject.toml`; `git diff --check` reported only the expected CRLF normalization warning for the checklist file.
+- [x] Final manual smoke test has been run.
+  - Evidence: Latest live `python main.py` conversation in `logs/interactions.jsonl` used session `c17247e5-3016-4fe1-adaa-a704f7b977cd`; 14 records, 14 successes, 0 failures, final response confirmed the test run as successful.
+  - Date: 2026-07-10
+  - Notes:
 
 ## Required Evidence Summary
 
@@ -272,37 +875,47 @@ Complete this section before Phase 1 exit.
 
 ```text
 Automated tests:
-Command:
-Result:
-Date:
+Command: python -m unittest discover -s tests
+Result: OK, 34 tests passed.
+Date: 2026-07-10
 
 Lint:
-Command:
-Result:
-Date:
+Command: .\.venv\Scripts\python.exe -m ruff check .
+Result: All checks passed.
+Date: 2026-07-10
+
+Format:
+Command: .\.venv\Scripts\python.exe -m ruff format --check .
+Result: 20 files already formatted.
+Date: 2026-07-10
 
 Type check, if enabled:
-Command:
-Result:
-Date:
+Command: Not run; no type checker is configured in pyproject.toml.
+Result: Not applicable.
+Date: 2026-07-10
+
+Whitespace check:
+Command: git diff --check
+Result: Exit code 0; only CRLF normalization warning for PHASE_1_EXIT_CRITERIA.md.
+Date: 2026-07-10
 
 Manual smoke test:
-Command:
-Result:
-Date:
+Command: python main.py
+Result: User reported the latest conversation went well. Log inspection found latest session c17247e5-3016-4fe1-adaa-a704f7b977cd with 14 records, 14 successes, 0 failures, and a final assistant response confirming the test run as successful.
+Date: 2026-07-10
 
 Log inspection:
-File inspected:
-Result:
-Date:
+File inspected: logs/interactions.jsonl
+Result: Exists, 35 JSONL records parsed. Latest session had 14 successes and 0 failures; total file contained 31 successes and 4 older ProviderUnavailableError failures from previous testing.
+Date: 2026-07-10
 
 Config failure test:
-Result:
-Date:
+Result: Missing config returned exit_code=1 with a clear startup error. User manually tested invalid config and confirmed it failed clearly.
+Date: 2026-07-08
 
 Provider failure test:
-Result:
-Date:
+Result: User observed a clear Gemini 500 error; automated provider tests cover timeout/auth/rate-limit/unavailable mappings.
+Date: 2026-07-08
 ```
 
 ## Deferred Or Waived Items
@@ -310,27 +923,27 @@ Date:
 Any incomplete item must be listed here before Phase 1 can exit.
 
 ```text
-Item:
-Reason:
-Risk:
-Approved by:
-Date:
-Follow-up:
+Item: None.
+Reason: No required Phase 1 item was waived.
+Risk: Not applicable.
+Approved by: Kaelion
+Date: 2026-07-10
+Follow-up: Not applicable.
 ```
 
 ## Phase 1 Exit Decision
 
 Phase 1 exit is approved only when the following is true:
 
-- [ ] Every required item is checked or explicitly documented as waived.
-- [ ] Waived items do not undermine the Phase 1 contract.
-- [ ] Evidence summary is complete.
-- [ ] No Phase 2 feature work has started.
-- [ ] Final reviewer agrees Phase 1 is stable enough to build on.
+- [x] Every required item is checked or explicitly documented as waived.
+- [x] Waived items do not undermine the Phase 1 contract.
+- [x] Evidence summary is complete.
+- [x] No Phase 2 feature work has started.
+- [x] Final reviewer agrees Phase 1 is stable enough to build on.
 
 ```text
-Phase 1 exit approved: yes/no
-Approved by:
-Date:
-Notes:
+Phase 1 exit approved: yes
+Approved by: Kaelion
+Date: 2026-07-10
+Notes: Approved after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed.
 ```
