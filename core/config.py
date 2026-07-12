@@ -66,7 +66,10 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> RuntimeConfig:
             PROVIDER_RETRY_DELAY_SECONDS_MIN,
             PROVIDER_RETRY_DELAY_SECONDS_MAX,
         ),
-        session_history_max_messages=_require_positive_int(data, "session_history_max_messages"),
+        session_history_max_messages=_require_even_positive_int(
+            data,
+            "session_history_max_messages",
+        ),
         max_user_input_chars=_require_positive_int(data, "max_user_input_chars"),
         api_key_env_var=_require_str(data, "api_key_env_var"),
         system_prompt_path=_resolve_path(_require_str(data, "system_prompt_path"), base_dir),
@@ -125,8 +128,15 @@ def _require_str(data: dict[str, Any], key: str) -> str:
 
 def _require_positive_int(data: dict[str, Any], key: str) -> int:
     value = data.get(key)
-    if not isinstance(value, int) or value <= 0:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ConfigurationError(f"Config value '{key}' must be a positive integer.")
+    return value
+
+
+def _require_even_positive_int(data: dict[str, Any], key: str) -> int:
+    value = _require_positive_int(data, key)
+    if value % 2 != 0:
+        raise ConfigurationError(f"Config value '{key}' must be an even positive integer.")
     return value
 
 

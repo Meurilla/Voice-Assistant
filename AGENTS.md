@@ -40,7 +40,7 @@ Allowed Phase 1 work:
 - Environment-variable secret loading.
 - Bounded session history for the current process.
 - Local JSONL interaction logging.
-- Graceful shutdown.
+- Graceful shutdown, including cleanup-failure behavior.
 - Clear error messages.
 - Unit tests.
 - Integration-style tests using fakes or mocks.
@@ -84,7 +84,7 @@ If a requested change falls outside Phase 1, do not implement it directly. Expla
 
 Use these defaults unless `PHASE_1.md` is deliberately updated:
 
-- Session history limit: last 10 conversation messages, excluding the system prompt.
+- Session history limit: last 10 conversation messages, excluding the system prompt; configured limits must be positive even integers.
 - Maximum user input length: 8,000 characters.
 - Log format: JSONL, one interaction per line.
 - Log location: local filesystem only.
@@ -189,7 +189,7 @@ When practical, test:
 - Logging success.
 - Logging failure.
 - JSONL log formatting.
-- Graceful shutdown.
+- Graceful shutdown and cleanup-failure behavior.
 
 ## Verification Standard
 

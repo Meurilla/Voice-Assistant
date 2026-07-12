@@ -72,6 +72,7 @@ class GeminiProvider:
         sleep_func: SleepFunc = time.sleep,
         clock_func: ClockFunc = time.perf_counter,
     ) -> None:
+        # Validate at the adapter boundary because callers can bypass config loading.
         if not api_key.strip():
             raise ProviderAuthenticationError("Provider API key is empty.")
         if not model.strip():
@@ -197,8 +198,6 @@ class GeminiProvider:
                     error_message=None,
                 )
                 return response
-
-        raise ProviderUnavailableError()
 
     @property
     def last_retry_count(self) -> int:

@@ -15,8 +15,10 @@ class Session:
     """In-memory bounded session history for the current process."""
 
     def __init__(self, max_messages: int) -> None:
-        if max_messages <= 0:
-            raise ValueError("max_messages must be greater than zero")
+        if isinstance(max_messages, bool) or not isinstance(max_messages, int) or max_messages <= 0:
+            raise ValueError("max_messages must be a positive integer")
+        if max_messages % 2 != 0:
+            raise ValueError("max_messages must be even")
         self.max_messages = max_messages
         self._messages: list[ConversationMessage] = []
 

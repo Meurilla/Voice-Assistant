@@ -8,7 +8,7 @@ Phase 1 is governed by `PHASE_1.md` and was approved in `PHASE_1_EXIT_CRITERIA.m
 
 Phase 1 is complete and signed off. The project has a CLI-only, text-only assistant loop, local config files, bounded in-memory session history, local JSONL interaction logging, one Gemini provider, and automated tests.
 
-On 2026-07-11, Phase 1 received a stabilization update for bounded provider retries, local provider diagnostics, and provider-neutral runtime errors. This did not add Phase 2 scope or change the original 2026-07-10 approval date.
+On 2026-07-11 and 2026-07-12, Phase 1 received in-scope stabilization updates covering bounded provider retries, local diagnostics, provider-neutral errors, SDK alignment, complete-turn session limits, request-stage interruption, deterministic provider cleanup, cleanup-failure handling, and expanded tests. These updates did not add Phase 2 scope or change the original 2026-07-10 approval date.
 
 Later-phase work must not start until the next phase scope is explicitly documented and approved.
 
@@ -20,7 +20,9 @@ Later-phase work must not start until the next phase scope is explicitly documen
 - Accepts text input from the command line.
 - Maintains bounded in-memory session history for the current process.
 - Writes local JSONL interaction logs.
-- Handles `/exit`, `/quit`, empty input, provider errors, and keyboard interruption paths.
+- Handles `/exit`, `/quit`, empty input, provider errors, and Ctrl+C while waiting for input or provider work.
+
+Only complete user/assistant turns are added to session history. A provider failure is logged locally but is not replayed to the provider on the next request.
 
 ## What It Does Not Do
 
@@ -60,6 +62,8 @@ Defaults in the scaffold:
 - `provider_name = "gemini"`
 - Exit commands: `/exit` and `/quit`
 
+`session_history_max_messages` must be a positive even integer. This keeps assistant-managed history bounded in complete user/assistant turns instead of allowing trimming to leave an orphaned assistant message.
+
 Gemma 4 supports `provider_thinking_level = "minimal"` or `"high"`. The default `minimal` setting requests thinking off/minimized for Phase 1.
 
 `provider_max_retries = 2` allows two retries after transient Gemini server-side failures (`500` or `503`), for at most three total attempts. `provider_retry_delay_seconds = 3` is the base delay: the assistant waits 3 seconds before the first retry and 6 seconds before the second. It does not retry invalid requests, authentication failures, rate limits, or input validation errors.
@@ -84,6 +88,8 @@ The assistant starts only if the config, prompt file, and `GEMINI_API_KEY` are p
 
 ## Test
 
+Phase 1 deliberately uses Python's standard-library `unittest`. The contract permits `pytest`, `pytest-cov`, and `mypy`, but they are not required or installed; Ruff is the only external development tool.
+
 ```powershell
 python -m unittest discover -s tests
 ```
@@ -107,11 +113,12 @@ Logs must never include API keys, raw environment dumps, or unnecessary system i
 - Missing config: confirm `config/settings.toml` exists.
 - Missing prompt: confirm `config/system_prompt.txt` exists.
 - Missing API key: set the environment variable named by `api_key_env_var`.
-- Invalid config: check that numeric values are valid integers, `provider_max_retries` is from 0 through 2, `provider_retry_delay_seconds` is from 0 through 10, and `provider_name` is `gemini`.
+- Invalid config: check that numeric values are integers rather than booleans, `session_history_max_messages` is positive and even, `provider_max_retries` is from 0 through 2, `provider_retry_delay_seconds` is from 0 through 10, and `provider_name` is `gemini`.
 - Provider authentication failed: check that `GEMINI_API_KEY` is set and valid.
 - Provider rate limit reached: wait and try again later, or use a model/key with more quota.
 - Provider request timed out: check network connectivity or increase `provider_timeout_seconds`.
 - Provider unavailable: check the configured model name, Gemini API availability, and installed dependencies. A `500 INTERNAL` or `503 UNAVAILABLE` response is usually transient; the assistant waits 3 seconds, retries, waits 6 seconds if needed, and retries once more by default. If all attempts fail, the CLI prints `I've encountered an error. Please retry.` and the local JSONL record retains the sanitized final status and diagnostic detail.
+- Shutdown error: provider-client cleanup failed. After an otherwise normal exit the CLI returns code `1`; if another error is already active, that original error is preserved.
 
 ## Phase 1 Exit
 

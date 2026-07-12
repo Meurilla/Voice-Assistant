@@ -76,6 +76,12 @@ class ConfigTests(unittest.TestCase):
                 "provider_timeout_seconds",
             ),
             (
+                "boolean timeout",
+                "provider_timeout_seconds = 30",
+                "provider_timeout_seconds = true",
+                "provider_timeout_seconds",
+            ),
+            (
                 "invalid thinking level",
                 'provider_thinking_level = "minimal"',
                 'provider_thinking_level = "medium"',
@@ -110,6 +116,12 @@ class ConfigTests(unittest.TestCase):
                 "session_history_max_messages = 10",
                 "session_history_max_messages = 0",
                 "session_history_max_messages",
+            ),
+            (
+                "odd history limit",
+                "session_history_max_messages = 10",
+                "session_history_max_messages = 9",
+                "even positive integer",
             ),
             (
                 "zero input limit",

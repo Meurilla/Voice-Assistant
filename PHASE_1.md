@@ -44,7 +44,7 @@ Start assistant
 
 Phase 1 must use these concrete defaults unless this contract is deliberately updated:
 
-- Session history limit: last 10 conversation messages, excluding the system prompt.
+- Session history limit: last 10 conversation messages, excluding the system prompt; configured limits must be positive even integers.
 - Maximum user input length: 8,000 characters.
 - Log format: JSONL, one interaction per line.
 - Log location: local filesystem only.
@@ -54,6 +54,8 @@ Phase 1 must use these concrete defaults unless this contract is deliberately up
 - Provider retry base delay: 3 seconds, configurable from 0 through 10 seconds.
 
 Only transient provider status `500` and `503` failures are retried. The retry delay uses exponential backoff, so the defaults wait 3 seconds before the first retry and 6 seconds before the second. The allowed configuration bounds limit intentional retry sleeping to at most 30 seconds, excluding provider request timeouts.
+
+Only complete user/assistant turns are retained in session history. Requiring an even message limit prevents normal assistant-managed history from being trimmed to an orphaned assistant turn. A provider failure is logged but is not added to the history sent with the next request.
 
 ## In Scope
 
@@ -204,7 +206,7 @@ Required:
 - Environment variable for API keys.
 - Separate system prompt file.
 - Clear startup error if required configuration is missing.
-- Explicit `session_history_max_messages` value, defaulting to 10.
+- Explicit `session_history_max_messages` value, defaulting to 10 and limited to positive even integers.
 - Explicit `max_user_input_chars` value, defaulting to 8,000.
 - Explicit `provider_timeout_seconds` value, defaulting to 30.
 - Explicit `provider_max_retries` value, defaulting to 2 and limited to integers from 0 through 2.
@@ -266,10 +268,14 @@ The assistant must handle these cases cleanly:
 - Provider rate limit.
 - Provider unavailable.
 - Transient provider `500` and `503` failures with bounded retry and backoff behavior.
-- Keyboard interrupt.
+- Keyboard interrupt while waiting for input or processing a provider request.
 - Log write failure.
 
 Handling cleanly means the assistant gives a useful message, preserves control of the process when appropriate, and does not print secrets.
+
+Normal and interrupted shutdown paths must close the provider client rather than relying on interpreter cleanup.
+
+If ordinary provider cleanup fails after an otherwise normal loop exit, the CLI must print a generic shutdown error and return a failure code. If cleanup fails while another exception is already active, the cleanup failure must be reported without replacing the original exception.
 
 ## Testing Requirements
 
@@ -280,9 +286,12 @@ Phase 1 must include tests for:
 - Assistant request flow.
 - Session history behavior.
 - Session history truncation at 10 conversation messages.
+- Assistant-to-provider history handoff after session truncation.
 - Input validation.
 - User input length validation.
 - Config loading.
+- Rejection of TOML booleans for integer settings.
+- Rejection of odd session-history limits and invalid direct `Session` inputs.
 - Missing config behavior.
 - Missing API key behavior.
 - Exit commands `/exit` and `/quit`.
@@ -291,14 +300,20 @@ Phase 1 must include tests for:
 - Provider timeout configuration.
 - Provider retry configuration bounds.
 - Transient provider retry count and backoff behavior.
+- Provider status mapping and retries using the official SDK exception shape.
 - Logging success.
 - Logging failure.
 - JSONL log formatting.
-- Graceful shutdown paths where practical.
+- Graceful shutdown paths, including keyboard interrupt during input and provider request processing.
+- Provider client cleanup through the CLI shutdown path.
+- Cleanup failure after normal loop completion returns a failure code.
+- Cleanup failure does not replace an active loop exception.
 
 Network calls must be mocked or faked in automated tests.
 
 No test should require a real API key unless it is explicitly marked as a manual or optional live-provider test.
+
+The Phase 1 implementation deliberately uses the standard-library `unittest` framework. The allowed development dependencies are optional rather than required; Ruff is the only external development tool installed by the Phase 1 `dev` extra.
 
 ## Manual Verification Requirements
 
@@ -318,7 +333,7 @@ Before Phase 1 can be considered complete, the following must be manually verifi
 - Logs are written as local JSONL and are reviewable.
 - Logs do not contain secrets.
 - Logs may contain conversation text, and this is clearly documented.
-- Ctrl+C exits cleanly.
+- Ctrl+C exits cleanly while waiting for input or processing a provider request.
 - Provider failure produces a useful error.
 - Provider timeout behavior uses the configured timeout, defaulting to 30 seconds.
 - README instructions are accurate.
@@ -355,6 +370,8 @@ Scope changes should be rare.
 ## Phase 1 Stabilization Amendment
 
 On 2026-07-11, the Phase 1 contract was amended to record the bounded provider retry policy, provider diagnostics, and provider-neutral failure messages added during post-exit stabilization. This amendment does not add Phase 2 scope or change the original Phase 1 approval date.
+
+On 2026-07-12, the Phase 1 contract was amended again to record complete-turn session limits, request-stage keyboard-interrupt handling, deterministic provider cleanup and cleanup-failure behavior, official SDK type and exception-shape alignment, stricter validation, and expanded automated coverage. This remains in-scope stabilization and does not add Phase 2 scope or change the original Phase 1 approval date.
 
 ## Later-Phase Parking Lot
 

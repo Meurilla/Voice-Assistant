@@ -4,6 +4,8 @@ import unittest
 from collections.abc import Sequence
 from typing import Any
 
+from google.genai import errors as genai_errors
+
 from core.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
@@ -249,6 +251,68 @@ class GeminiProviderTests(unittest.TestCase):
                 )
                 self.assertEqual(provider.last_request_metadata.error_message, "provider error")
 
+    def test_generate_response_maps_official_sdk_client_error_code(self) -> None:
+        error = genai_errors.ClientError(
+            401,
+            {
+                "error": {
+                    "code": 401,
+                    "message": "API key rejected",
+                    "status": "UNAUTHENTICATED",
+                }
+            },
+        )
+        provider = GeminiProvider(
+            api_key="secret",
+            model="gemma-4-31b-it",
+            thinking_level="minimal",
+            max_retries=0,
+            client=FakeClient(FakeModels(error=error)),
+        )
+
+        with self.assertRaises(ProviderAuthenticationError):
+            provider.generate_response(
+                system_prompt="system prompt",
+                messages=[ConversationMessage(role="user", content="hello")],
+                timeout_seconds=30,
+            )
+
+        self.assertEqual(provider.last_request_metadata.final_status_code, error.code)
+
+    def test_generate_response_retries_official_sdk_server_error_code(self) -> None:
+        error = genai_errors.ServerError(
+            500,
+            {
+                "error": {
+                    "code": 500,
+                    "message": "Internal error encountered.",
+                    "status": "INTERNAL",
+                }
+            },
+        )
+        models = SequencedModels([error, FakeResponse("recovered")])
+        sleep_calls: list[float] = []
+        provider = GeminiProvider(
+            api_key="secret",
+            model="gemma-4-31b-it",
+            thinking_level="minimal",
+            max_retries=1,
+            retry_delay_seconds=3,
+            client=FakeClient(models),
+            sleep_func=sleep_calls.append,
+        )
+
+        response = provider.generate_response(
+            system_prompt="system prompt",
+            messages=[ConversationMessage(role="user", content="hello")],
+            timeout_seconds=30,
+        )
+
+        self.assertEqual(response, "recovered")
+        self.assertEqual(len(models.calls), 2)
+        self.assertEqual(sleep_calls, [3])
+        self.assertEqual(provider.last_request_metadata.retry_count, 1)
+
     def test_generate_response_retries_transient_server_error_once(self) -> None:
         models = SequencedModels([StatusError(500), FakeResponse("recovered")])
         sleep_calls: list[float] = []
@@ -305,6 +369,34 @@ class GeminiProviderTests(unittest.TestCase):
         self.assertEqual(provider.last_request_metadata.retry_count, 2)
         self.assertEqual(provider.last_request_metadata.final_status_code, 500)
         self.assertEqual(provider.last_request_metadata.error_message, "provider error")
+
+    def test_generate_response_propagates_keyboard_interrupt_during_retry_delay(self) -> None:
+        models = SequencedModels([StatusError(500), FakeResponse("unused")])
+
+        def interrupt_sleep(delay: float) -> None:
+            self.assertEqual(delay, 3)
+            raise KeyboardInterrupt
+
+        provider = GeminiProvider(
+            api_key="secret",
+            model="gemma-4-31b-it",
+            thinking_level="minimal",
+            max_retries=1,
+            retry_delay_seconds=3,
+            client=FakeClient(models),
+            sleep_func=interrupt_sleep,
+        )
+
+        with self.assertRaises(KeyboardInterrupt):
+            provider.generate_response(
+                system_prompt="system prompt",
+                messages=[ConversationMessage(role="user", content="hello")],
+                timeout_seconds=30,
+            )
+
+        self.assertEqual(len(models.calls), 1)
+        self.assertEqual(provider.last_request_metadata.attempt_count, 1)
+        self.assertEqual(provider.last_request_metadata.retry_count, 1)
 
     def test_generate_response_redacts_api_key_from_diagnostics(self) -> None:
         api_key = "configured-secret-value-1234567890"

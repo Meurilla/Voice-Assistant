@@ -22,6 +22,17 @@ def _default_error_output(message: str) -> None:
     print(message, file=sys.stderr)
 
 
+def _close_assistant(assistant: Assistant) -> bool:
+    """Close assistant resources and report an ordinary cleanup failure safely."""
+
+    try:
+        assistant.close()
+    except Exception:
+        _default_error_output("Shutdown error: Could not close provider resources.")
+        return False
+    return True
+
+
 def build_assistant(config_path: Path = DEFAULT_CONFIG_PATH) -> Assistant:
     """Build the assistant from local config, environment secrets, and provider wiring."""
 
@@ -55,7 +66,15 @@ def run(config_path: Path = DEFAULT_CONFIG_PATH) -> int:
         print(f"Startup error: {exc.user_message}", file=sys.stderr)
         return 1
 
-    return run_loop(assistant)
+    try:
+        exit_code = run_loop(assistant)
+    except BaseException:
+        _close_assistant(assistant)
+        raise
+
+    if not _close_assistant(assistant):
+        return 1
+    return exit_code
 
 
 def run_loop(
@@ -72,27 +91,32 @@ def run_loop(
 
     while True:
         try:
-            raw_input = input_func("> ")
-        except (EOFError, KeyboardInterrupt):
+            try:
+                raw_input = input_func("> ")
+            except EOFError:
+                output_func("")
+                output_func("Goodbye.")
+                return 0
+
+            if is_exit_command(raw_input):
+                output_func("Goodbye.")
+                return 0
+
+            try:
+                reply = assistant.handle_user_input(raw_input)
+            except InputValidationError as exc:
+                error_func(exc.user_message)
+                continue
+            except ProviderError as exc:
+                error_func(exc.user_message)
+                if exc.log_error:
+                    error_func(exc.log_error)
+                continue
+
+            output_func(reply.text)
+            if reply.log_error:
+                error_func(reply.log_error)
+        except KeyboardInterrupt:
             output_func("")
             output_func("Goodbye.")
             return 0
-
-        if is_exit_command(raw_input):
-            output_func("Goodbye.")
-            return 0
-
-        try:
-            reply = assistant.handle_user_input(raw_input)
-        except InputValidationError as exc:
-            error_func(exc.user_message)
-            continue
-        except ProviderError as exc:
-            error_func(exc.user_message)
-            if exc.log_error:
-                error_func(exc.log_error)
-            continue
-
-        output_func(reply.text)
-        if reply.log_error:
-            error_func(reply.log_error)

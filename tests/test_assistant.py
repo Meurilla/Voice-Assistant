@@ -25,6 +25,7 @@ class FakeProvider:
         metadata: ProviderRequestMetadata | None = None,
     ) -> None:
         self.response = response
+        self.closed = False
         self.last_request_metadata = metadata or ProviderRequestMetadata(
             attempt_count=1,
             elapsed_ms=25,
@@ -40,6 +41,9 @@ class FakeProvider:
     ) -> str:
         self.calls.append((system_prompt, tuple(messages), timeout_seconds))
         return self.response
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class FailingProvider:
@@ -62,6 +66,9 @@ class FailingProvider:
         timeout_seconds: int,
     ) -> str:
         raise ProviderUnavailableError("Provider unavailable for test.")
+
+    def close(self) -> None:
+        pass
 
 
 class AssistantTests(unittest.TestCase):
@@ -95,6 +102,38 @@ class AssistantTests(unittest.TestCase):
             self.assertIsNone(record["provider_final_status_code"])
             self.assertIsNone(record["provider_error_message"])
             self.assertEqual(record["provider_elapsed_ms"], 25)
+
+    def test_assistant_passes_current_bounded_history_to_provider(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            provider = FakeProvider(response="latest response")
+            assistant = _assistant(
+                Path(temp_dir) / "interactions.jsonl",
+                provider,
+            )
+            for index in range(12):
+                role = "user" if index % 2 == 0 else "assistant"
+                assistant.session.add(role, f"history-{index}")
+
+            assistant.handle_user_input("latest request")
+
+            _, messages, _ = provider.calls[0]
+            expected_messages = tuple(
+                ConversationMessage(
+                    role="user" if index % 2 == 0 else "assistant",
+                    content=f"history-{index}",
+                )
+                for index in range(2, 12)
+            ) + (ConversationMessage(role="user", content="latest request"),)
+            self.assertEqual(messages, expected_messages)
+
+    def test_close_releases_provider_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            provider = FakeProvider(response="hello back")
+            assistant = _assistant(Path(temp_dir) / "interactions.jsonl", provider)
+
+            assistant.close()
+
+            self.assertTrue(provider.closed)
 
     def test_assistant_logs_provider_failure_without_updating_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

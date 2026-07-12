@@ -77,6 +77,7 @@ class Assistant:
                 provider_error.log_error = log_error
             raise provider_error from exc
 
+        # Commit only complete turns so a failed request is not replayed without a response.
         self.session.add("user", user_input)
         self.session.add("assistant", response)
         log_error = self._try_log(
@@ -86,6 +87,11 @@ class Assistant:
             error_type=None,
         )
         return AssistantReply(text=response, log_error=log_error)
+
+    def close(self) -> None:
+        """Release resources owned by the configured provider."""
+
+        self.provider.close()
 
     def _try_log(
         self,

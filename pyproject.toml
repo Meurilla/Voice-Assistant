@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Tests use Python's unittest; Ruff is the only external Phase 1 development tool.
 dev = [
   "ruff>=0.8,<1",
 ]

@@ -136,9 +136,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] `session_history_max_messages` is explicit and defaults to 10.
-  - Evidence: `config/settings.toml` sets `session_history_max_messages = 10`; config loading test asserts this value.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `config/settings.toml` sets `session_history_max_messages = 10`; config tests assert the default and reject zero or odd values; Session tests reject invalid direct limits.
+  - Date: 2026-07-12
+  - Notes: Configurable history limits must be positive even integers so normal assistant-managed history retains complete turns.
 - [x] `max_user_input_chars` is explicit and defaults to 8,000.
   - Evidence: `config/settings.toml` sets `max_user_input_chars = 8000`; config loading test asserts this value.
   - Date: 2026-07-08
@@ -160,8 +160,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Invalid config produces a clear startup error.
-  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_values` verifies invalid values raise `ConfigurationError` with specific messages.
-  - Date: 2026-07-08
+  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_values` verifies invalid values, including TOML booleans for integer fields and odd history limits, raise `ConfigurationError` with specific messages.
+  - Date: 2026-07-12
   - Notes: `interfaces/cli.py::run` catches `AssistantError` and prints startup errors.
 - [x] Missing prompt file produces a clear startup error.
   - Evidence: `tests/test_cli.py::test_run_reports_missing_prompt_file_startup_error`.
@@ -176,8 +176,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] No silent fallback hides unsafe or invalid configuration.
-  - Evidence: `core/config.py` requires non-empty strings, valid integer ranges, supported thinking levels, bounded retry settings, and `provider_name = "gemini"`.
-  - Date: 2026-07-11
+  - Evidence: `core/config.py` requires non-empty strings, non-boolean integers, positive even session limits, valid integer ranges, supported thinking levels, bounded retry settings, and `provider_name = "gemini"`.
+  - Date: 2026-07-12
   - Notes:
 
 ## 4. Core Assistant Behavior
@@ -215,9 +215,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Session history is passed consistently to the provider when expected.
-  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config` verifies user/model role conversion and message order.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config` verifies user/model role conversion and message order; `tests/test_assistant.py::test_assistant_logs_provider_failure_without_updating_session` verifies failed turns are excluded.
+  - Date: 2026-07-12
+  - Notes: Only complete user/assistant turns are sent as subsequent history.
 - [x] Assistant handles multiple prompts in one run.
   - Evidence: `interfaces/cli.py::run_loop` continues after successful responses and handled validation/provider errors; user reported a 4-message live run.
   - Date: 2026-07-08
@@ -231,9 +231,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Assistant exits cleanly on keyboard interrupt.
-  - Evidence: `tests/test_cli.py::test_run_loop_exits_cleanly_on_keyboard_interrupt`; user-reported manual keyboard interrupt test passed.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: CLI tests cover keyboard interrupt at the input prompt and during `assistant.handle_user_input`; the provider test verifies interruption during retry sleep propagates to the CLI boundary. The user-reported prompt-level manual test also passed.
+  - Date: 2026-07-12
+  - Notes: Request-stage interruption now exits with code 0 and prints `Goodbye.` without a traceback.
 - [x] Assistant does not expose internal stack traces during normal user-facing failures.
   - Evidence: `interfaces/cli.py` catches startup, input validation, and provider errors and prints user-facing messages; tests cover startup and shutdown paths.
   - Date: 2026-07-08
@@ -274,12 +274,12 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Provider unavailable path is tested or manually simulated.
-  - Evidence: Provider tests cover empty responses, bounded `500`/`503` retries, final status capture, and generic user-facing failure; user previously observed a live `500 INTERNAL` provider failure.
-  - Date: 2026-07-11
-  - Notes: The default now permits two retries with 3-second and 6-second delays.
+  - Evidence: Provider tests cover empty responses, bounded `500`/`503` retries, final status capture, generic user-facing failure, and real `google.genai.errors.ServerError.code` retry behavior; the user previously observed a live `500 INTERNAL` provider failure.
+  - Date: 2026-07-12
+  - Notes: The default permits two retries with 3-second and 6-second delays; official SDK source and tests confirm HTTP status is exposed as `.code`.
 - [x] Provider errors become clear user-facing messages.
-  - Evidence: `providers/gemini_provider.py::_map_provider_exception` maps failures to provider-neutral `ProviderError` messages; CLI tests verify exhausted unavailable errors print `I've encountered an error. Please retry.` without a raw provider payload.
-  - Date: 2026-07-11
+  - Evidence: `providers/gemini_provider.py::_map_provider_exception` maps failures to provider-neutral `ProviderError` messages; tests include a real `google.genai.errors.ClientError.code`; CLI tests verify exhausted unavailable errors print `I've encountered an error. Please retry.` without a raw provider payload.
+  - Date: 2026-07-12
   - Notes: Authentication, rate-limit, timeout, invalid-request, and unavailable categories retain distinct actionable messages.
 - [x] Provider errors are logged without leaking secrets.
   - Evidence: `core/assistant.py` logs error type plus request diagnostics; provider and logger tests verify configured API keys are redacted from diagnostic messages.
@@ -408,9 +408,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-11
   - Notes:
 - [x] Keyboard interrupt handled cleanly.
-  - Evidence: CLI keyboard interrupt test passes; user-reported manual keyboard interrupt test passed.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `tests/test_cli.py` covers interruption during input and request processing; `tests/test_gemini_provider.py` simulates interruption during transient-error retry delay.
+  - Date: 2026-07-12
+  - Notes: `KeyboardInterrupt` remains uncaught by the provider and is handled at the CLI loop boundary.
 - [x] Log write failure handled cleanly.
   - Evidence: Logging failure tests cover `LogWriteError`, successful provider replies, provider-error replies, and CLI output of attached log-write failures.
   - Date: 2026-07-09
@@ -435,12 +435,12 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes: Uses a fake provider; no live network call.
 - [x] Session history behavior is tested.
-  - Evidence: `tests/test_session.py::test_add_stores_messages`.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `tests/test_session.py` covers storage, truncation, invalid limits, invalid roles, and empty content; `tests/test_assistant.py::test_assistant_passes_current_bounded_history_to_provider` covers the assistant/provider boundary.
+  - Date: 2026-07-12
+  - Notes: The integration test overfills the session and verifies the provider receives the current bounded snapshot plus the new request.
 - [x] Session history truncation at 10 conversation messages is tested.
-  - Evidence: `tests/test_session.py::test_session_truncates_to_last_10_messages`.
-  - Date: 2026-07-08
+  - Evidence: `tests/test_session.py::test_session_truncates_to_last_10_messages` verifies storage; `tests/test_assistant.py::test_assistant_passes_current_bounded_history_to_provider` verifies the truncated history crosses the assistant/provider boundary.
+  - Date: 2026-07-12
   - Notes:
 - [x] Input validation is tested.
   - Evidence: `tests/test_safety.py::test_validate_user_input_accepts_text` and `test_validate_user_input_rejects_empty_text`.
@@ -459,8 +459,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Invalid config behavior is tested.
-  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_integer` and `test_load_config_rejects_invalid_values`.
-  - Date: 2026-07-08
+  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_integer` and `test_load_config_rejects_invalid_values`, including boolean-as-integer and odd history-limit cases.
+  - Date: 2026-07-12
   - Notes:
 - [x] Missing API key behavior is tested.
   - Evidence: `tests/test_config.py::test_load_api_key_rejects_missing_environment_variable`.
@@ -483,9 +483,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Provider failure is tested with a fake or mock.
-  - Evidence: `tests/test_assistant.py::test_assistant_logs_provider_failure_without_updating_session` and provider status mapping tests.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `tests/test_assistant.py::test_assistant_logs_provider_failure_without_updating_session`; provider tests use fake clients with both local fake exceptions and real official SDK exception instances.
+  - Date: 2026-07-12
+  - Notes: No live network call or API key is required.
 - [x] Provider timeout configuration is tested.
   - Evidence: `tests/test_gemini_provider.py::test_generate_response_sends_text_history_and_config` asserts `http_options.timeout == 30000`.
   - Date: 2026-07-08
@@ -503,9 +503,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Graceful shutdown paths are tested where practical.
-  - Evidence: `tests/test_cli.py` covers `/exit`, `/quit`, and keyboard interrupt.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `tests/test_cli.py` covers `/exit`, `/quit`, input-stage keyboard interrupt, request-stage keyboard interrupt, successful provider cleanup, cleanup failure after normal completion, cleanup failure during an active loop exception, and the concrete CLI-to-`GeminiProvider` client-close chain; provider tests cover retry-sleep interruption propagation.
+  - Date: 2026-07-12
+  - Notes: A normal cleanup failure prints a generic message and returns `1`; an active loop exception is preserved when cleanup also fails. `test_run_closes_gemini_provider_client_after_shutdown` verifies the SDK client fake is closed.
 - [x] Tests do not depend on execution order.
   - Evidence: Full discovery run passed with `python -m unittest discover -s tests`.
   - Date: 2026-07-08
@@ -645,9 +645,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Keyboard interrupt exits cleanly.
-  - Evidence: User-reported manual keyboard interrupt test passed; `tests/test_cli.py::test_run_loop_exits_cleanly_on_keyboard_interrupt` also passes.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: User-reported manual keyboard interrupt at the input prompt passed. Automated tests now also cover interruption during provider request processing and retry delay.
+  - Date: 2026-07-12
+  - Notes: The mid-retry path is deterministically simulated because a live transient-error retry window is not reliably reproducible on demand.
 - [x] Provider failure produces a useful error.
   - Evidence: The latest live session recorded one final status `500` after 3 attempts and 2 retries as `ProviderUnavailableError`; automated CLI tests verify the user-facing message is `I've encountered an error. Please retry.`
   - Date: 2026-07-12
@@ -709,12 +709,12 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Notes:
 - [x] README includes test instructions.
   - Evidence: README `Test` section documents `python -m unittest discover -s tests` and optional Ruff linting.
-  - Date: 2026-07-08
-  - Notes:
+  - Date: 2026-07-12
+  - Notes: README and `pyproject.toml` record that Phase 1 deliberately uses standard-library `unittest`, with Ruff as its only external development tool.
 - [x] README includes troubleshooting notes.
   - Evidence: README `Troubleshooting` section reviewed.
-  - Date: 2026-07-08
-  - Notes: It covers missing config, missing prompt, missing API key, invalid config, auth, rate limit, timeout, and provider unavailability.
+  - Date: 2026-07-12
+  - Notes: It covers missing config, missing prompt, missing API key, invalid config, auth, rate limit, timeout, provider unavailability, and provider cleanup failure.
 - [x] README documents that logs are local JSONL files.
   - Evidence: README `Logging` section says runtime logs are written locally as JSONL to `logs/interactions.jsonl` by default.
   - Date: 2026-07-08
@@ -853,8 +853,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-09
   - Notes: README matches current setup, config defaults, run/test commands, logging behavior, troubleshooting, and Phase 1 limitations.
 - [x] No obvious dead code remains.
-  - Evidence: Production modules in `main.py`, `core/`, `interfaces/`, and `providers/` were reviewed; Ruff check passed.
-  - Date: 2026-07-09
+  - Evidence: Production modules in `main.py`, `core/`, `interfaces/`, and `providers/` were reviewed; the unreachable post-retry raise was removed from `GeminiProvider._generate_with_retries`; Ruff check passed.
+  - Date: 2026-07-12
   - Notes:
 - [x] No temporary debug prints remain.
   - Evidence: `rg -n "TODO|FIXME|XXX|HACK|debug|breakpoint\(|pdb|print\(" . -g "!logs/**" -g "!*.jsonl" -g "!.venv/**" -g "!.git/**" -g "!.ruff_cache/**"` found only documentation uses of "debug" and intentional CLI `print` calls.
@@ -932,7 +932,7 @@ Phase 1 was originally approved on 2026-07-10. On 2026-07-11, an in-scope stabil
 
 The stabilization pass also amended `PHASE_1.md` and `AGENTS.md` to record the implemented retry defaults and limits. It did not add any Phase 2 feature, provider fallback, background task, or additional external service. The original Phase 1 approval date remains unchanged.
 
-On 2026-07-12, follow-up stabilization aligned the local Gemini client protocol with the official SDK's read-only `models` property and added a narrow type cast at the SDK boundary. The user confirmed that both VS Code/Pylance diagnostics cleared.
+On 2026-07-12, follow-up stabilization aligned the local Gemini client protocol with the official SDK's read-only `models` property and added a narrow type cast at the SDK boundary. The user confirmed that both VS Code/Pylance diagnostics cleared. The same pass expanded CLI keyboard-interrupt handling across the complete loop iteration, including provider request and retry-delay processing; made CLI shutdown deterministically close provider resources while handling cleanup failures without replacing active exceptions; tightened integer and session-limit validation; verified mapping against official SDK exception instances; and removed an unreachable provider fallback.
 
 ```text
 Stabilization automated tests:
@@ -966,7 +966,22 @@ Date: 2026-07-12
 
 Stabilization follow-up validation:
 Commands: python -m unittest discover -s tests; Ruff check; Ruff format check; git diff --check
-Result: 38 tests passed; lint and format checks passed; whitespace check exited 0 with expected CRLF warnings.
+Result: 40 tests passed; lint and format checks passed; whitespace check exited 0 with expected CRLF warnings.
+Date: 2026-07-12
+
+Stabilization keyboard interrupt coverage:
+Result: Automated tests verify clean CLI shutdown during input and request processing, plus KeyboardInterrupt propagation from Gemini retry sleep.
+Date: 2026-07-12
+
+Stabilization lifecycle and policy validation:
+Commands: python -m unittest discover -s tests; Ruff check; Ruff format check; git diff --check
+Result: 54 tests passed; lint and format checks passed; whitespace check exited 0 with expected CRLF warnings.
+Coverage: Concrete CLI-to-Gemini client cleanup, cleanup-failure behavior, bounded complete-turn history, integer and Session guards, official SDK exception mapping, longest-first overlapping-secret redaction, and exclusion of failed turns from session history.
+Date: 2026-07-12
+
+Stabilization SDK exception-shape verification:
+Source: Installed official `google-genai` package, `google/genai/errors.py`.
+Result: `APIError` assigns HTTP status to `.code`; automated tests instantiate real `ClientError` and `ServerError` objects and verify mapping and retry behavior through that attribute.
 Date: 2026-07-12
 
 Stabilization live provider test:
@@ -1002,5 +1017,5 @@ Phase 1 exit is approved only when the following is true:
 Phase 1 exit approved: yes
 Approved by: Kaelion
 Date: 2026-07-10
-Notes: Original approval after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed. See `Post-Exit Phase 1 Stabilization` for the 2026-07-11 in-scope maintenance record.
+Notes: Original approval after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed. See `Post-Exit Phase 1 Stabilization` for subsequent in-scope maintenance records through 2026-07-12.
 ```

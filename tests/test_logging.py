@@ -90,6 +90,25 @@ class LoggingTests(unittest.TestCase):
                 "provider echoed [REDACTED_API_KEY]",
             )
 
+    def test_log_interaction_redacts_overlapping_secrets_longest_first(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "interactions.jsonl"
+            logger = InteractionLogger(
+                log_file,
+                secrets=("shared-secret", "shared-secret-with-suffix"),
+            )
+
+            logger.log_interaction(
+                session_id="session-1",
+                user_input="shared-secret-with-suffix",
+                assistant_response=None,
+                provider_name="gemini",
+                success=False,
+            )
+
+            record = json.loads(log_file.read_text(encoding="utf-8"))
+            self.assertEqual(record["user_input"], "[REDACTED_API_KEY]")
+
     def test_log_interaction_redacts_google_api_key_shaped_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_file = Path(temp_dir) / "interactions.jsonl"

@@ -32,3 +32,6 @@ class LLMProvider(Protocol):
         timeout_seconds: int,
     ) -> str:
         """Return a provider response for the supplied conversation."""
+
+    def close(self) -> None:
+        """Release resources held by the provider client."""
