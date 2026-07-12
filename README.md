@@ -8,6 +8,8 @@ Phase 1 is governed by `PHASE_1.md` and was approved in `PHASE_1_EXIT_CRITERIA.m
 
 Phase 1 is complete and signed off. The project has a CLI-only, text-only assistant loop, local config files, bounded in-memory session history, local JSONL interaction logging, one Gemini provider, and automated tests.
 
+On 2026-07-11, Phase 1 received a stabilization update for bounded provider retries, local provider diagnostics, and provider-neutral runtime errors. This did not add Phase 2 scope or change the original 2026-07-10 approval date.
+
 Later-phase work must not start until the next phase scope is explicitly documented and approved.
 
 ## What It Does
@@ -53,13 +55,16 @@ Defaults in the scaffold:
 - `provider_timeout_seconds = 30`
 - `provider_model = "gemma-4-31b-it"`
 - `provider_thinking_level = "minimal"`
-- `provider_max_retries = 1`
+- `provider_max_retries = 2`
+- `provider_retry_delay_seconds = 3`
 - `provider_name = "gemini"`
 - Exit commands: `/exit` and `/quit`
 
 Gemma 4 supports `provider_thinking_level = "minimal"` or `"high"`. The default `minimal` setting requests thinking off/minimized for Phase 1.
 
-`provider_max_retries = 1` retries one transient Gemini server-side failure (`500` or `503`) before returning an error. It does not retry invalid requests, authentication failures, rate limits, or input validation errors.
+`provider_max_retries = 2` allows two retries after transient Gemini server-side failures (`500` or `503`), for at most three total attempts. `provider_retry_delay_seconds = 3` is the base delay: the assistant waits 3 seconds before the first retry and 6 seconds before the second. It does not retry invalid requests, authentication failures, rate limits, or input validation errors.
+
+`provider_max_retries` accepts integers from 0 through 2. `provider_retry_delay_seconds` accepts integers from 0 through 10. At the maximum allowed values, exponential backoff sleeps for 10 seconds and then 20 seconds, limiting intentional retry delay to 30 seconds; provider request timeouts are separate.
 
 The API key must come from the environment. Do not put secrets in config files.
 
@@ -91,9 +96,9 @@ python -m ruff check .
 
 ## Logging
 
-Runtime logs are written locally as JSONL to `logs/interactions.jsonl` by default. Each line is one interaction record with timestamp, session ID, user input, assistant response when available, provider name, success state, and error type when applicable.
+Runtime logs are written locally as JSONL to `logs/interactions.jsonl` by default. Each line is one interaction record with timestamp, session ID, user input, assistant response when available, provider name, success state, error type when applicable, provider attempt and retry counts, final error status code when available, sanitized provider error detail, and total provider elapsed time in milliseconds. Elapsed time includes retry delays.
 
-Phase 1 logs may include conversation text. Before writing JSONL, the logger redacts the loaded API key and Google API-key-shaped text from user and assistant conversation fields. This is a safety guard, not general-purpose secret management; avoid pasting secrets into the assistant because they may still be sent to the configured provider during the live request.
+Phase 1 logs may include conversation text. Before writing JSONL, the logger redacts the loaded API key and Google API-key-shaped text from user, assistant, and provider-error fields. Provider error detail is also sanitized and limited to 500 characters by the adapter. These are safety guards, not general-purpose secret management; avoid pasting secrets into the assistant because they may still be sent to the configured provider during the live request.
 
 Logs must never include API keys, raw environment dumps, or unnecessary system information. Runtime logs are ignored by git; `logs/.gitkeep` exists only to keep the directory.
 
@@ -102,12 +107,12 @@ Logs must never include API keys, raw environment dumps, or unnecessary system i
 - Missing config: confirm `config/settings.toml` exists.
 - Missing prompt: confirm `config/system_prompt.txt` exists.
 - Missing API key: set the environment variable named by `api_key_env_var`.
-- Invalid config: check that numeric values are positive integers and `provider_name` is `gemini`.
+- Invalid config: check that numeric values are valid integers, `provider_max_retries` is from 0 through 2, `provider_retry_delay_seconds` is from 0 through 10, and `provider_name` is `gemini`.
 - Provider authentication failed: check that `GEMINI_API_KEY` is set and valid.
 - Provider rate limit reached: wait and try again later, or use a model/key with more quota.
 - Provider request timed out: check network connectivity or increase `provider_timeout_seconds`.
-- Provider unavailable: check the configured model name, Gemini API availability, and installed dependencies. A `500 INTERNAL` or `503 UNAVAILABLE` response is usually a transient provider-side issue; the assistant retries once by default.
+- Provider unavailable: check the configured model name, Gemini API availability, and installed dependencies. A `500 INTERNAL` or `503 UNAVAILABLE` response is usually transient; the assistant waits 3 seconds, retries, waits 6 seconds if needed, and retries once more by default. If all attempts fail, the CLI prints `I've encountered an error. Please retry.` and the local JSONL record retains the sanitized final status and diagnostic detail.
 
 ## Phase 1 Exit
 
-Phase 1 is complete. The exit decision, evidence, manual verification, log inspection, and validation results are recorded in `PHASE_1_EXIT_CRITERIA.md`.
+Phase 1 is complete. The original exit decision and the post-exit stabilization record, evidence, manual verification, log inspection, and validation results are recorded in `PHASE_1_EXIT_CRITERIA.md`.

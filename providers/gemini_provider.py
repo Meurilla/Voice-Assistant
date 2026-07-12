@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import re
 import socket
+import time
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol
+from dataclasses import replace
+from typing import Any, Protocol, cast
 
+from core.config import (
+    PROVIDER_MAX_RETRIES_MAX,
+    PROVIDER_MAX_RETRIES_MIN,
+    PROVIDER_RETRY_DELAY_SECONDS_MAX,
+    PROVIDER_RETRY_DELAY_SECONDS_MIN,
+)
 from core.errors import (
     ProviderAuthenticationError,
     ProviderError,
@@ -15,6 +23,7 @@ from core.errors import (
     ProviderUnavailableError,
 )
 from core.session import ConversationMessage
+from providers.base import ProviderRequestMetadata
 
 
 class GeminiModelsClient(Protocol):
@@ -33,10 +42,16 @@ class GeminiModelsClient(Protocol):
 class GeminiClient(Protocol):
     """Subset of the Gemini SDK client required by the provider."""
 
-    models: GeminiModelsClient
+    @property
+    def models(self) -> GeminiModelsClient:
+        """Return the models API used by this adapter."""
+
+        ...
 
 
 ClientFactory = Callable[[str], GeminiClient]
+SleepFunc = Callable[[float], None]
+ClockFunc = Callable[[], float]
 
 
 class GeminiProvider:
@@ -50,25 +65,51 @@ class GeminiProvider:
         api_key: str,
         model: str,
         thinking_level: str,
-        max_retries: int = 1,
+        max_retries: int = PROVIDER_MAX_RETRIES_MAX,
+        retry_delay_seconds: int = 3,
         client: GeminiClient | None = None,
         client_factory: ClientFactory | None = None,
+        sleep_func: SleepFunc = time.sleep,
+        clock_func: ClockFunc = time.perf_counter,
     ) -> None:
         if not api_key.strip():
-            raise ProviderAuthenticationError("Gemini API key is empty.")
+            raise ProviderAuthenticationError("Provider API key is empty.")
         if not model.strip():
-            raise ProviderUnavailableError("Gemini model must not be empty.")
+            raise ProviderUnavailableError("Provider model must not be empty.")
         if thinking_level not in {"minimal", "high"}:
-            raise ProviderUnavailableError("Gemini thinking level must be minimal or high.")
-        if max_retries < 0:
-            raise ProviderUnavailableError("Gemini max retries must not be negative.")
+            raise ProviderUnavailableError("Provider thinking level must be minimal or high.")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or not PROVIDER_MAX_RETRIES_MIN <= max_retries <= PROVIDER_MAX_RETRIES_MAX
+        ):
+            raise ProviderUnavailableError(
+                "Provider max retries must be an integer from "
+                f"{PROVIDER_MAX_RETRIES_MIN} to {PROVIDER_MAX_RETRIES_MAX}."
+            )
+        if (
+            isinstance(retry_delay_seconds, bool)
+            or not isinstance(retry_delay_seconds, int)
+            or not PROVIDER_RETRY_DELAY_SECONDS_MIN
+            <= retry_delay_seconds
+            <= PROVIDER_RETRY_DELAY_SECONDS_MAX
+        ):
+            raise ProviderUnavailableError(
+                "Provider retry delay must be an integer from "
+                f"{PROVIDER_RETRY_DELAY_SECONDS_MIN} "
+                f"to {PROVIDER_RETRY_DELAY_SECONDS_MAX}."
+            )
 
         self._api_key = api_key
         self.model = model.strip()
         self.thinking_level = thinking_level
         self.max_retries = max_retries
+        self.retry_delay_seconds = retry_delay_seconds
+        self.last_request_metadata = ProviderRequestMetadata()
         self._client = client
         self._client_factory = client_factory or _default_client_factory
+        self._sleep_func = sleep_func
+        self._clock_func = clock_func
 
     def generate_response(
         self,
@@ -79,16 +120,36 @@ class GeminiProvider:
     ) -> str:
         """Generate a text response from Gemini for the supplied conversation."""
 
-        response = self._generate_with_retries(
-            system_prompt=system_prompt,
-            messages=messages,
-            timeout_seconds=timeout_seconds,
-        )
-
-        text = _extract_response_text(response)
-        if not text:
-            raise ProviderUnavailableError("Gemini returned an empty response.")
-        return text
+        started_at = self._clock_func()
+        self.last_request_metadata = ProviderRequestMetadata()
+        try:
+            response = self._generate_with_retries(
+                system_prompt=system_prompt,
+                messages=messages,
+                timeout_seconds=timeout_seconds,
+            )
+            text = _extract_response_text(response)
+            if not text:
+                self._record_failure(
+                    status_code=None,
+                    error_message="Gemini returned an empty response.",
+                )
+                raise ProviderUnavailableError()
+            return text
+        except ProviderError:
+            raise
+        except Exception as exc:
+            self._record_failure(
+                status_code=_status_code_from_exception(exc),
+                error_message=_safe_exception_message(exc, self._api_key),
+            )
+            raise ProviderUnavailableError from exc
+        finally:
+            elapsed_seconds = max(0.0, self._clock_func() - started_at)
+            self.last_request_metadata = replace(
+                self.last_request_metadata,
+                elapsed_ms=int(elapsed_seconds * 1000),
+            )
 
     def _generate_with_retries(
         self,
@@ -99,8 +160,12 @@ class GeminiProvider:
     ) -> Any:
         attempts = self.max_retries + 1
         for attempt in range(attempts):
+            self.last_request_metadata = replace(
+                self.last_request_metadata,
+                attempt_count=attempt + 1,
+            )
             try:
-                return self._get_client().models.generate_content(
+                response = self._get_client().models.generate_content(
                     model=self.model,
                     contents=_to_gemini_contents(messages),
                     config={
@@ -110,11 +175,36 @@ class GeminiProvider:
                     },
                 )
             except Exception as exc:
+                self._record_failure(
+                    status_code=_status_code_from_exception(exc),
+                    error_message=_safe_exception_message(exc, self._api_key),
+                )
                 if attempt < self.max_retries and _is_retryable_provider_exception(exc):
+                    retry_count = self.last_request_metadata.retry_count + 1
+                    self.last_request_metadata = replace(
+                        self.last_request_metadata,
+                        retry_count=retry_count,
+                    )
+                    retry_delay = self.retry_delay_seconds * (2 ** (retry_count - 1))
+                    if retry_delay:
+                        self._sleep_func(retry_delay)
                     continue
-                raise _map_provider_exception(exc, self._api_key) from exc
+                raise _map_provider_exception(exc) from exc
+            else:
+                self.last_request_metadata = replace(
+                    self.last_request_metadata,
+                    final_status_code=None,
+                    error_message=None,
+                )
+                return response
 
-        raise ProviderUnavailableError("Gemini provider request failed.")
+        raise ProviderUnavailableError()
+
+    @property
+    def last_retry_count(self) -> int:
+        """Return the retry count retained for backwards-compatible diagnostics."""
+
+        return self.last_request_metadata.retry_count
 
     def close(self) -> None:
         """Close the underlying SDK client when it exposes a close method."""
@@ -128,6 +218,18 @@ class GeminiProvider:
             self._client = self._client_factory(self._api_key)
         return self._client
 
+    def _record_failure(
+        self,
+        *,
+        status_code: int | None,
+        error_message: str,
+    ) -> None:
+        self.last_request_metadata = replace(
+            self.last_request_metadata,
+            final_status_code=status_code,
+            error_message=error_message,
+        )
+
 
 def _default_client_factory(api_key: str) -> GeminiClient:
     try:
@@ -137,7 +239,7 @@ def _default_client_factory(api_key: str) -> GeminiClient:
             "google-genai is not installed. Run python -m pip install -e .[dev]."
         ) from exc
 
-    return genai.Client(api_key=api_key)
+    return cast(GeminiClient, genai.Client(api_key=api_key))
 
 
 def _to_gemini_contents(
@@ -168,28 +270,26 @@ def _extract_response_text(response: Any) -> str:
     return ""
 
 
-def _map_provider_exception(exc: Exception, api_key: str) -> ProviderError:
+def _map_provider_exception(exc: Exception) -> ProviderError:
+    if isinstance(exc, ProviderError):
+        return exc
+
     status_code = _status_code_from_exception(exc)
-    details = _safe_exception_message(exc, api_key)
     if isinstance(exc, (TimeoutError, socket.timeout)) or status_code in {408, 504}:
-        return ProviderTimeoutError("Gemini provider request timed out.")
+        return ProviderTimeoutError()
     if status_code in {401, 403}:
-        return ProviderAuthenticationError(
-            "Gemini authentication failed. Check the configured API key."
-        )
+        return ProviderAuthenticationError()
     if status_code == 429:
-        return ProviderRateLimitError("Gemini rate limit reached. Try again later.")
+        return ProviderRateLimitError()
     if status_code == 400:
         return ProviderUnavailableError(
-            f"Gemini provider rejected the request as invalid: {details}"
+            "The request was rejected. Check the model configuration and try again."
         )
     if status_code is not None:
-        return ProviderUnavailableError(
-            f"Gemini provider request failed with status {status_code}: {details}"
-        )
+        return ProviderUnavailableError()
     if "timeout" in type(exc).__name__.lower():
-        return ProviderTimeoutError("Gemini provider request timed out.")
-    return ProviderUnavailableError(f"Gemini provider request failed: {details}")
+        return ProviderTimeoutError()
+    return ProviderUnavailableError()
 
 
 def _status_code_from_exception(exc: Exception) -> int | None:

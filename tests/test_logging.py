@@ -34,6 +34,36 @@ class LoggingTests(unittest.TestCase):
             self.assertEqual(record["provider_name"], "gemini")
             self.assertTrue(record["success"])
             self.assertIsNone(record["error_type"])
+            self.assertEqual(record["provider_attempt_count"], 0)
+            self.assertEqual(record["provider_retry_count"], 0)
+            self.assertIsNone(record["provider_final_status_code"])
+            self.assertIsNone(record["provider_error_message"])
+            self.assertIsNone(record["provider_elapsed_ms"])
+
+    def test_log_interaction_writes_provider_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "interactions.jsonl"
+            logger = InteractionLogger(log_file)
+
+            logger.log_interaction(
+                session_id="session-1",
+                user_input="hello",
+                assistant_response="hi",
+                provider_name="gemini",
+                success=True,
+                provider_attempt_count=3,
+                provider_retry_count=2,
+                provider_final_status_code=500,
+                provider_error_message="500 INTERNAL",
+                provider_elapsed_ms=9012,
+            )
+
+            record = json.loads(log_file.read_text(encoding="utf-8"))
+            self.assertEqual(record["provider_attempt_count"], 3)
+            self.assertEqual(record["provider_retry_count"], 2)
+            self.assertEqual(record["provider_final_status_code"], 500)
+            self.assertEqual(record["provider_error_message"], "500 INTERNAL")
+            self.assertEqual(record["provider_elapsed_ms"], 9012)
 
     def test_log_interaction_redacts_configured_secret_from_conversation_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -47,6 +77,7 @@ class LoggingTests(unittest.TestCase):
                 assistant_response=f"you pasted {secret}",
                 provider_name="gemini",
                 success=True,
+                provider_error_message=f"provider echoed {secret}",
             )
 
             log_text = log_file.read_text(encoding="utf-8")
@@ -54,6 +85,10 @@ class LoggingTests(unittest.TestCase):
             record = json.loads(log_text)
             self.assertEqual(record["user_input"], "my key is [REDACTED_API_KEY]")
             self.assertEqual(record["assistant_response"], "you pasted [REDACTED_API_KEY]")
+            self.assertEqual(
+                record["provider_error_message"],
+                "provider echoed [REDACTED_API_KEY]",
+            )
 
     def test_log_interaction_redacts_google_api_key_shaped_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -67,6 +102,7 @@ class LoggingTests(unittest.TestCase):
                 assistant_response=f"echoed {pasted_key}",
                 provider_name="gemini",
                 success=True,
+                provider_error_message=f"provider echoed {pasted_key}",
             )
 
             log_text = log_file.read_text(encoding="utf-8")
@@ -74,6 +110,10 @@ class LoggingTests(unittest.TestCase):
             record = json.loads(log_text)
             self.assertEqual(record["user_input"], "accidental paste [REDACTED_API_KEY]")
             self.assertEqual(record["assistant_response"], "echoed [REDACTED_API_KEY]")
+            self.assertEqual(
+                record["provider_error_message"],
+                "provider echoed [REDACTED_API_KEY]",
+            )
 
     def test_log_interaction_reports_write_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

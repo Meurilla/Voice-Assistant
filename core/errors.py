@@ -48,25 +48,25 @@ class ProviderError(AssistantError):
 class ProviderAuthenticationError(ProviderError):
     """Raised when the provider rejects authentication credentials."""
 
-    default_message = "Provider authentication failed."
+    default_message = "Authentication failed. Check the configured API key."
 
 
 class ProviderRateLimitError(ProviderError):
     """Raised when the provider reports a rate-limit condition."""
 
-    default_message = "Provider rate limit reached."
+    default_message = "The service is temporarily rate-limited. Please try again later."
 
 
 class ProviderTimeoutError(ProviderError):
     """Raised when the provider request exceeds the configured timeout."""
 
-    default_message = "Provider request timed out."
+    default_message = "The request timed out. Please try again."
 
 
 class ProviderUnavailableError(ProviderError):
     """Raised when the provider is unavailable or returns unusable output."""
 
-    default_message = "Provider is unavailable."
+    default_message = "I've encountered an error. Please retry."
 
 
 class LogWriteError(AssistantError):

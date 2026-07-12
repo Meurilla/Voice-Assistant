@@ -33,6 +33,7 @@ def build_assistant(config_path: Path = DEFAULT_CONFIG_PATH) -> Assistant:
         model=config.provider_model,
         thinking_level=config.provider_thinking_level,
         max_retries=config.provider_max_retries,
+        retry_delay_seconds=config.provider_retry_delay_seconds,
     )
     session = Session(max_messages=config.session_history_max_messages)
     interaction_logger = InteractionLogger(config.log_file, secrets=(api_key,))

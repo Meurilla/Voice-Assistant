@@ -2,7 +2,8 @@ provider_name = "gemini"
 provider_model = "gemma-4-31b-it"
 provider_timeout_seconds = 30
 provider_thinking_level = "minimal"
-provider_max_retries = 1
+provider_max_retries = 2
+provider_retry_delay_seconds = 3
 
 session_history_max_messages = 10
 max_user_input_chars = 8000

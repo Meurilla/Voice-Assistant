@@ -84,7 +84,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(
             outputs,
             [
-                "Provider unavailable for CLI test.",
+                "I've encountered an error. Please retry.",
                 "Could not write interaction log for CLI test.",
                 "Goodbye.",
             ],
@@ -103,7 +103,6 @@ class _ProviderFailAssistant:
 
     def handle_user_input(self, raw_input: str):  # pragma: no cover
         raise ProviderUnavailableError(
-            "Provider unavailable for CLI test.",
             log_error="Could not write interaction log for CLI test.",
         )
 
@@ -115,7 +114,8 @@ def _valid_settings() -> str:
         provider_model = "gemma-4-31b-it"
         provider_timeout_seconds = 30
         provider_thinking_level = "minimal"
-        provider_max_retries = 1
+        provider_max_retries = 2
+        provider_retry_delay_seconds = 3
         session_history_max_messages = 10
         max_user_input_chars = 8000
         api_key_env_var = "GEMINI_API_KEY"

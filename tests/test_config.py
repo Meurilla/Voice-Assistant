@@ -27,7 +27,8 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(config.provider_model, "gemma-4-31b-it")
             self.assertEqual(config.provider_timeout_seconds, 30)
             self.assertEqual(config.provider_thinking_level, "minimal")
-            self.assertEqual(config.provider_max_retries, 1)
+            self.assertEqual(config.provider_max_retries, 2)
+            self.assertEqual(config.provider_retry_delay_seconds, 3)
             self.assertEqual(config.session_history_max_messages, 10)
             self.assertEqual(config.max_user_input_chars, 8000)
             self.assertEqual(config.system_prompt_path, root / "config/system_prompt.txt")
@@ -82,9 +83,27 @@ class ConfigTests(unittest.TestCase):
             ),
             (
                 "negative retry count",
-                "provider_max_retries = 1",
+                "provider_max_retries = 2",
                 "provider_max_retries = -1",
                 "provider_max_retries",
+            ),
+            (
+                "retry count above Phase 1 limit",
+                "provider_max_retries = 2",
+                "provider_max_retries = 3",
+                "provider_max_retries",
+            ),
+            (
+                "negative retry delay",
+                "provider_retry_delay_seconds = 3",
+                "provider_retry_delay_seconds = -1",
+                "provider_retry_delay_seconds",
+            ),
+            (
+                "retry delay above Phase 1 limit",
+                "provider_retry_delay_seconds = 3",
+                "provider_retry_delay_seconds = 11",
+                "provider_retry_delay_seconds",
             ),
             (
                 "zero history limit",
@@ -150,7 +169,8 @@ def _valid_settings() -> str:
         provider_model = "gemma-4-31b-it"
         provider_timeout_seconds = 30
         provider_thinking_level = "minimal"
-        provider_max_retries = 1
+        provider_max_retries = 2
+        provider_retry_delay_seconds = 3
         session_history_max_messages = 10
         max_user_input_chars = 8000
         api_key_env_var = "GEMINI_API_KEY"

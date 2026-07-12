@@ -11,6 +11,10 @@ from typing import Any
 from core.errors import ConfigurationError, MissingConfigError, MissingSecretError
 
 DEFAULT_CONFIG_PATH = Path("config/settings.toml")
+PROVIDER_MAX_RETRIES_MIN = 0
+PROVIDER_MAX_RETRIES_MAX = 2
+PROVIDER_RETRY_DELAY_SECONDS_MIN = 0
+PROVIDER_RETRY_DELAY_SECONDS_MAX = 10
 
 
 @dataclass(frozen=True)
@@ -22,6 +26,7 @@ class RuntimeConfig:
     provider_timeout_seconds: int
     provider_thinking_level: str
     provider_max_retries: int
+    provider_retry_delay_seconds: int
     session_history_max_messages: int
     max_user_input_chars: int
     api_key_env_var: str
@@ -49,7 +54,18 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> RuntimeConfig:
         provider_model=_require_str(data, "provider_model"),
         provider_timeout_seconds=_require_positive_int(data, "provider_timeout_seconds"),
         provider_thinking_level=_require_thinking_level(data, "provider_thinking_level"),
-        provider_max_retries=_require_non_negative_int(data, "provider_max_retries"),
+        provider_max_retries=_require_int_in_range(
+            data,
+            "provider_max_retries",
+            PROVIDER_MAX_RETRIES_MIN,
+            PROVIDER_MAX_RETRIES_MAX,
+        ),
+        provider_retry_delay_seconds=_require_int_in_range(
+            data,
+            "provider_retry_delay_seconds",
+            PROVIDER_RETRY_DELAY_SECONDS_MIN,
+            PROVIDER_RETRY_DELAY_SECONDS_MAX,
+        ),
         session_history_max_messages=_require_positive_int(data, "session_history_max_messages"),
         max_user_input_chars=_require_positive_int(data, "max_user_input_chars"),
         api_key_env_var=_require_str(data, "api_key_env_var"),
@@ -114,10 +130,17 @@ def _require_positive_int(data: dict[str, Any], key: str) -> int:
     return value
 
 
-def _require_non_negative_int(data: dict[str, Any], key: str) -> int:
+def _require_int_in_range(
+    data: dict[str, Any],
+    key: str,
+    minimum: int,
+    maximum: int,
+) -> int:
     value = data.get(key)
-    if not isinstance(value, int) or value < 0:
-        raise ConfigurationError(f"Config value '{key}' must be a non-negative integer.")
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        raise ConfigurationError(
+            f"Config value '{key}' must be an integer from {minimum} to {maximum}."
+        )
     return value
 
 

@@ -11,6 +11,7 @@ from core.config import RuntimeConfig
 from core.errors import ProviderUnavailableError
 from core.logging import InteractionLogger
 from core.session import ConversationMessage, Session
+from providers.base import ProviderRequestMetadata
 
 
 class FakeProvider:
@@ -18,8 +19,16 @@ class FakeProvider:
 
     name = "gemini"
 
-    def __init__(self, response: str = "assistant response") -> None:
+    def __init__(
+        self,
+        response: str = "assistant response",
+        metadata: ProviderRequestMetadata | None = None,
+    ) -> None:
         self.response = response
+        self.last_request_metadata = metadata or ProviderRequestMetadata(
+            attempt_count=1,
+            elapsed_ms=25,
+        )
         self.calls: list[tuple[str, tuple[ConversationMessage, ...], int]] = []
 
     def generate_response(
@@ -37,6 +46,13 @@ class FailingProvider:
     """Provider fake that raises a deterministic provider error."""
 
     name = "gemini"
+    last_request_metadata = ProviderRequestMetadata(
+        attempt_count=3,
+        retry_count=2,
+        final_status_code=500,
+        error_message="500 INTERNAL",
+        elapsed_ms=9000,
+    )
 
     def generate_response(
         self,
@@ -74,6 +90,11 @@ class AssistantTests(unittest.TestCase):
             record = json.loads(log_file.read_text(encoding="utf-8").splitlines()[0])
             self.assertTrue(record["success"])
             self.assertEqual(record["assistant_response"], "hello back")
+            self.assertEqual(record["provider_attempt_count"], 1)
+            self.assertEqual(record["provider_retry_count"], 0)
+            self.assertIsNone(record["provider_final_status_code"])
+            self.assertIsNone(record["provider_error_message"])
+            self.assertEqual(record["provider_elapsed_ms"], 25)
 
     def test_assistant_logs_provider_failure_without_updating_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -87,6 +108,31 @@ class AssistantTests(unittest.TestCase):
             record = json.loads(log_file.read_text(encoding="utf-8").splitlines()[0])
             self.assertFalse(record["success"])
             self.assertEqual(record["error_type"], "ProviderUnavailableError")
+            self.assertEqual(record["provider_attempt_count"], 3)
+            self.assertEqual(record["provider_retry_count"], 2)
+            self.assertEqual(record["provider_final_status_code"], 500)
+            self.assertEqual(record["provider_error_message"], "500 INTERNAL")
+            self.assertEqual(record["provider_elapsed_ms"], 9000)
+
+    def test_assistant_logs_provider_retry_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "interactions.jsonl"
+            provider = FakeProvider(
+                response="hello back",
+                metadata=ProviderRequestMetadata(
+                    attempt_count=2,
+                    retry_count=1,
+                    elapsed_ms=3025,
+                ),
+            )
+            assistant = _assistant(log_file, provider)
+
+            assistant.handle_user_input("hello")
+
+            record = json.loads(log_file.read_text(encoding="utf-8").splitlines()[0])
+            self.assertEqual(record["provider_attempt_count"], 2)
+            self.assertEqual(record["provider_retry_count"], 1)
+            self.assertEqual(record["provider_elapsed_ms"], 3025)
 
     def test_assistant_attaches_log_failure_to_provider_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -128,7 +174,8 @@ def _assistant(
         provider_model="gemma-4-31b-it",
         provider_timeout_seconds=30,
         provider_thinking_level="minimal",
-        provider_max_retries=1,
+        provider_max_retries=2,
+        provider_retry_delay_seconds=3,
         session_history_max_messages=10,
         max_user_input_chars=8000,
         api_key_env_var="GEMINI_API_KEY",

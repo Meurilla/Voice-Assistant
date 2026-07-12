@@ -50,6 +50,10 @@ Phase 1 must use these concrete defaults unless this contract is deliberately up
 - Log location: local filesystem only.
 - Exit commands: `/exit` and `/quit`.
 - Provider timeout: 30 seconds.
+- Provider maximum retries: 2, configurable from 0 through 2.
+- Provider retry base delay: 3 seconds, configurable from 0 through 10 seconds.
+
+Only transient provider status `500` and `503` failures are retried. The retry delay uses exponential backoff, so the defaults wait 3 seconds before the first retry and 6 seconds before the second. The allowed configuration bounds limit intentional retry sleeping to at most 30 seconds, excluding provider request timeouts.
 
 ## In Scope
 
@@ -203,6 +207,8 @@ Required:
 - Explicit `session_history_max_messages` value, defaulting to 10.
 - Explicit `max_user_input_chars` value, defaulting to 8,000.
 - Explicit `provider_timeout_seconds` value, defaulting to 30.
+- Explicit `provider_max_retries` value, defaulting to 2 and limited to integers from 0 through 2.
+- Explicit `provider_retry_delay_seconds` value, defaulting to 3 and limited to integers from 0 through 10.
 
 Not allowed:
 
@@ -232,6 +238,11 @@ Required log fields:
 - Provider name.
 - Success or failure state.
 - Error type when applicable.
+- Provider attempt count.
+- Provider retry count.
+- Final provider error status code when available.
+- Sanitized provider error detail when available.
+- Provider elapsed time in milliseconds.
 
 Logs must not include:
 
@@ -254,6 +265,7 @@ The assistant must handle these cases cleanly:
 - Provider authentication failure.
 - Provider rate limit.
 - Provider unavailable.
+- Transient provider `500` and `503` failures with bounded retry and backoff behavior.
 - Keyboard interrupt.
 - Log write failure.
 
@@ -277,6 +289,8 @@ Phase 1 must include tests for:
 - Provider success.
 - Provider failure.
 - Provider timeout configuration.
+- Provider retry configuration bounds.
+- Transient provider retry count and backoff behavior.
 - Logging success.
 - Logging failure.
 - JSONL log formatting.
@@ -337,6 +351,10 @@ If a proposed change is not clearly in scope, it must not be implemented until o
 3. The reason for the exception is documented.
 
 Scope changes should be rare.
+
+## Phase 1 Stabilization Amendment
+
+On 2026-07-11, the Phase 1 contract was amended to record the bounded provider retry policy, provider diagnostics, and provider-neutral failure messages added during post-exit stabilization. This amendment does not add Phase 2 scope or change the original Phase 1 approval date.
 
 ## Later-Phase Parking Lot
 

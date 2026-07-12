@@ -10,7 +10,7 @@ from core.errors import LogWriteError, ProviderError, ProviderUnavailableError
 from core.logging import InteractionLogger
 from core.safety import validate_user_input
 from core.session import ConversationMessage, Session
-from providers.base import LLMProvider
+from providers.base import LLMProvider, ProviderRequestMetadata
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ class Assistant:
                 exc.log_error = log_error
             raise
         except Exception as exc:
-            provider_error = ProviderUnavailableError("Provider request failed unexpectedly.")
+            provider_error = ProviderUnavailableError()
             log_error = self._try_log(
                 user_input=user_input,
                 assistant_response=None,
@@ -95,6 +95,7 @@ class Assistant:
         success: bool,
         error_type: str | None,
     ) -> str | None:
+        provider_metadata = self._provider_request_metadata()
         try:
             self.interaction_logger.log_interaction(
                 session_id=self.session_id,
@@ -103,7 +104,22 @@ class Assistant:
                 provider_name=self.provider.name,
                 success=success,
                 error_type=error_type,
+                provider_attempt_count=provider_metadata.attempt_count,
+                provider_retry_count=provider_metadata.retry_count,
+                provider_final_status_code=provider_metadata.final_status_code,
+                provider_error_message=provider_metadata.error_message,
+                provider_elapsed_ms=provider_metadata.elapsed_ms,
             )
         except LogWriteError as exc:
             return exc.user_message
         return None
+
+    def _provider_request_metadata(self) -> ProviderRequestMetadata:
+        value = getattr(self.provider, "last_request_metadata", None)
+        if isinstance(value, ProviderRequestMetadata):
+            return value
+
+        retry_count = getattr(self.provider, "last_retry_count", 0)
+        if not isinstance(retry_count, int) or retry_count < 0:
+            retry_count = 0
+        return ProviderRequestMetadata(attempt_count=1, retry_count=retry_count)

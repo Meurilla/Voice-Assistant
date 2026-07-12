@@ -32,6 +32,11 @@ class InteractionLogger:
         provider_name: str,
         success: bool,
         error_type: str | None = None,
+        provider_attempt_count: int = 0,
+        provider_retry_count: int = 0,
+        provider_final_status_code: int | None = None,
+        provider_error_message: str | None = None,
+        provider_elapsed_ms: int | None = None,
     ) -> None:
         """Write one interaction record, raising a user-facing error on failure."""
 
@@ -43,6 +48,11 @@ class InteractionLogger:
             "provider_name": provider_name,
             "success": success,
             "error_type": error_type,
+            "provider_attempt_count": provider_attempt_count,
+            "provider_retry_count": provider_retry_count,
+            "provider_final_status_code": provider_final_status_code,
+            "provider_error_message": self._redact_secrets(provider_error_message),
+            "provider_elapsed_ms": provider_elapsed_ms,
         }
 
         try:

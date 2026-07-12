@@ -147,6 +147,14 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Evidence: `config/settings.toml` sets `provider_timeout_seconds = 30`; provider test asserts it is sent as 30000 milliseconds.
   - Date: 2026-07-08
   - Notes:
+- [x] `provider_max_retries` is explicit, defaults to 2, and is bounded from 0 through 2.
+  - Evidence: `config/settings.toml` sets `provider_max_retries = 2`; config and provider tests reject values above the Phase 1 limit.
+  - Date: 2026-07-11
+  - Notes: The setting permits disabling or reducing retries without allowing an unbounded retry loop.
+- [x] `provider_retry_delay_seconds` is explicit, defaults to 3, and is bounded from 0 through 10.
+  - Evidence: `config/settings.toml` sets `provider_retry_delay_seconds = 3`; config and provider tests reject values above the Phase 1 limit.
+  - Date: 2026-07-11
+  - Notes: With at most two retries, the upper bound limits intentional exponential-backoff sleeping to 30 seconds.
 - [x] Missing config produces a clear startup error.
   - Evidence: Non-live startup check returned `Startup error: Missing config file: missing-settings-for-verification.toml`; unit test covers missing config.
   - Date: 2026-07-08
@@ -168,8 +176,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] No silent fallback hides unsafe or invalid configuration.
-  - Evidence: `core/config.py` requires non-empty strings, positive integers, supported thinking levels, and `provider_name = "gemini"`.
-  - Date: 2026-07-08
+  - Evidence: `core/config.py` requires non-empty strings, valid integer ranges, supported thinking levels, bounded retry settings, and `provider_name = "gemini"`.
+  - Date: 2026-07-11
   - Notes:
 
 ## 4. Core Assistant Behavior
@@ -266,17 +274,17 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Provider unavailable path is tested or manually simulated.
-  - Evidence: Provider tests cover empty responses and `500`; user observed a clear live `500 INTERNAL` provider failure.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: Provider tests cover empty responses, bounded `500`/`503` retries, final status capture, and generic user-facing failure; user previously observed a live `500 INTERNAL` provider failure.
+  - Date: 2026-07-11
+  - Notes: The default now permits two retries with 3-second and 6-second delays.
 - [x] Provider errors become clear user-facing messages.
-  - Evidence: `providers/gemini_provider.py::_map_provider_exception` maps provider failures to specific `ProviderError` subclasses/messages; CLI catches `ProviderError`.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `providers/gemini_provider.py::_map_provider_exception` maps failures to provider-neutral `ProviderError` messages; CLI tests verify exhausted unavailable errors print `I've encountered an error. Please retry.` without a raw provider payload.
+  - Date: 2026-07-11
+  - Notes: Authentication, rate-limit, timeout, invalid-request, and unavailable categories retain distinct actionable messages.
 - [x] Provider errors are logged without leaking secrets.
-  - Evidence: `core/assistant.py` logs provider failures by error type only; provider and logger redaction tests cover API-key-shaped text.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: `core/assistant.py` logs error type plus request diagnostics; provider and logger tests verify configured API keys are redacted from diagnostic messages.
+  - Date: 2026-07-11
+  - Notes: Diagnostic detail is sanitized and limited to 500 characters before logging, with logger redaction applied again.
 - [x] No automated test requires a live API key.
   - Evidence: Provider tests inject fake clients and fake API key strings; full test suite passed without a real API key.
   - Date: 2026-07-08
@@ -345,8 +353,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Logs do not include unnecessary system information.
-  - Evidence: Log record fields are limited to timestamp, session ID, conversation fields, provider name, success state, and error type.
-  - Date: 2026-07-08
+  - Evidence: Log record fields are limited to interaction data and bounded provider diagnostics: attempt/retry counts, final status, sanitized error detail, and elapsed milliseconds.
+  - Date: 2026-07-11
   - Notes:
 - [x] Logs are not sent to an external logging service.
   - Evidence: `InteractionLogger` only writes to the local filesystem path.
@@ -357,9 +365,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] A generated log file has been manually inspected.
-  - Evidence: `logs/interactions.jsonl` inspection found 12 parseable JSONL records and zero Google API-key-shaped leaks.
-  - Date: 2026-07-08
-  - Notes: Conversation text was not printed during inspection.
+  - Evidence: Original inspection found 12 parseable records and zero Google API-key-shaped leaks. A metadata-only follow-up inspection parsed the latest 11-record live session and verified all provider diagnostic fields were present.
+  - Date: 2026-07-12
+  - Notes: Conversation text was not printed during either inspection.
 
 ## 7. Error Handling
 
@@ -368,8 +376,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Invalid config value handled cleanly.
-  - Evidence: Config tests cover invalid provider, model, timeout, thinking level, retry count, history limit, and input limit.
-  - Date: 2026-07-08
+  - Evidence: Config tests cover invalid provider, model, timeout, thinking level, retry count and delay below and above their bounds, history limit, and input limit.
+  - Date: 2026-07-11
   - Notes:
 - [x] Missing API key handled cleanly.
   - Evidence: Non-live startup check returned exit code 1 and a clear missing-API-key startup error; unit test covers missing key.
@@ -396,8 +404,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Provider unavailable handled cleanly.
-  - Evidence: Assistant provider-failure test and provider unavailable status/empty-response tests pass; user observed a clear live `500` error message.
-  - Date: 2026-07-08
+  - Evidence: Assistant, provider, and CLI tests verify bounded retries, provider-neutral output, diagnostic logging, and continued CLI control after failure; user previously observed a live `500` failure.
+  - Date: 2026-07-11
   - Notes:
 - [x] Keyboard interrupt handled cleanly.
   - Evidence: CLI keyboard interrupt test passes; user-reported manual keyboard interrupt test passed.
@@ -585,8 +593,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Normal prompt and response works.
-  - Evidence: User-reported live manual run with `python main.py`: prompts returned assistant replies, including four successful send/reply cycles after retry handling was added.
-  - Date: 2026-07-08
+  - Evidence: User-reported live manual runs with `python main.py`; the latest inspected session logged 10 successful provider responses.
+  - Date: 2026-07-12
   - Notes: Live provider behavior depends on Gemini availability and quota.
 - [x] Empty input is handled cleanly.
   - Evidence: User confirmed manual empty-input behavior can be marked complete; automated validation also covers empty input rejection.
@@ -597,9 +605,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Multi-turn session behaves as expected.
-  - Evidence: User-reported live manual run sent 4 messages and received 4 replies with no logged errors.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: The latest user-run live session logged 11 interactions in one session, including successful continuation after transient provider failures.
+  - Date: 2026-07-12
+  - Notes: Metadata-only inspection found 10 successes and 1 handled provider failure.
 - [x] Session history remains bounded to the last 10 conversation messages.
   - Evidence: User manually tested bounded session history and confirmed it remains limited to the last 10 conversation messages.
   - Date: 2026-07-08
@@ -641,9 +649,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Provider failure produces a useful error.
-  - Evidence: User observed `Gemini provider request failed with status 500: 500 INTERNAL...`; provider error mapping tests cover status-specific user-facing errors.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: The latest live session recorded one final status `500` after 3 attempts and 2 retries as `ProviderUnavailableError`; automated CLI tests verify the user-facing message is `I've encountered an error. Please retry.`
+  - Date: 2026-07-12
+  - Notes: The CLI retained control and later interactions in the same session succeeded.
 - [x] Provider timeout uses the configured timeout, defaulting to 30 seconds.
   - Evidence: Provider test asserts timeout config is sent as `30000` milliseconds; `config/settings.toml` sets `provider_timeout_seconds = 30`.
   - Date: 2026-07-08
@@ -673,8 +681,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Notes: User confirmed fresh setup, virtual environment creation, and dependency installation worked from the README instructions.
 - [x] README includes configuration instructions.
   - Evidence: README `Configuration` section reviewed.
-  - Date: 2026-07-08
-  - Notes: It documents `config/settings.toml`, the API-key environment variable, defaults, model, thinking level, and retry behavior.
+  - Date: 2026-07-11
+  - Notes: It documents `config/settings.toml`, the API-key environment variable, defaults, model, thinking level, bounded retry settings, and backoff behavior.
 - [x] README documents the default session history limit of 10 conversation messages.
   - Evidence: README `Configuration` section lists `session_history_max_messages = 10`.
   - Date: 2026-07-08
@@ -775,8 +783,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] No unnecessary personal data is collected.
-  - Evidence: Log records are limited to timestamp, session ID, conversation fields, provider name, success state, and error type.
-  - Date: 2026-07-08
+  - Evidence: Log records are limited to interaction fields and bounded provider request diagnostics needed for local troubleshooting.
+  - Date: 2026-07-11
   - Notes: Conversation text logging is a documented Phase 1 behavior.
 - [x] No external service is contacted except the configured LLM provider during normal live use.
   - Evidence: Source review shows the only live external client path is `GeminiProvider` creating `google.genai.Client` for configured provider requests.
@@ -794,9 +802,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] The assistant can recover from a provider error and continue when appropriate.
-  - Evidence: User observed a clear transient Gemini `500 INTERNAL` provider error; later live testing sent 4 messages and received 4 replies after provider-local retry handling was added.
-  - Date: 2026-07-08
-  - Notes: CLI catches provider errors and continues the input loop when appropriate.
+  - Evidence: User observed a transient Gemini `500 INTERNAL` provider error; provider tests verify up to two retries with 3-second and 6-second backoff, and CLI tests verify control returns to the input loop after exhaustion.
+  - Date: 2026-07-11
+  - Notes: Retry remains provider-local and bounded; it is not provider fallback.
 - [x] The assistant can exit without corrupting logs.
   - Evidence: User confirmed `/exit` and `/quit` manual checks passed; local log inspection parsed all 12 lines as valid JSONL records.
   - Date: 2026-07-08
@@ -918,6 +926,55 @@ Result: User observed a clear Gemini 500 error; automated provider tests cover t
 Date: 2026-07-08
 ```
 
+## Post-Exit Phase 1 Stabilization
+
+Phase 1 was originally approved on 2026-07-10. On 2026-07-11, an in-scope stabilization pass added bounded transient provider retries, exponential backoff, local provider request diagnostics, secret-safe diagnostic logging, and provider-neutral runtime errors.
+
+The stabilization pass also amended `PHASE_1.md` and `AGENTS.md` to record the implemented retry defaults and limits. It did not add any Phase 2 feature, provider fallback, background task, or additional external service. The original Phase 1 approval date remains unchanged.
+
+On 2026-07-12, follow-up stabilization aligned the local Gemini client protocol with the official SDK's read-only `models` property and added a narrow type cast at the SDK boundary. The user confirmed that both VS Code/Pylance diagnostics cleared.
+
+```text
+Stabilization automated tests:
+Command: python -m unittest discover -s tests
+Result: OK, 38 tests passed.
+Date: 2026-07-11
+
+Stabilization lint:
+Command: .\.venv\Scripts\python.exe -m ruff check .
+Result: All checks passed.
+Date: 2026-07-11
+
+Stabilization format:
+Command: .\.venv\Scripts\python.exe -m ruff format --check .
+Result: 20 files already formatted.
+Date: 2026-07-11
+
+Stabilization type check:
+Command: Not run; no type checker is configured in pyproject.toml.
+Result: Not applicable.
+Date: 2026-07-11
+
+Stabilization whitespace check:
+Command: git diff --check
+Result: Exit code 0; Git reported expected CRLF normalization warnings for modified text files.
+Date: 2026-07-11
+
+Stabilization editor diagnostics:
+Result: User confirmed the Gemini client protocol and SDK factory return warnings are cleared in VS Code/Pylance.
+Date: 2026-07-12
+
+Stabilization follow-up validation:
+Commands: python -m unittest discover -s tests; Ruff check; Ruff format check; git diff --check
+Result: 38 tests passed; lint and format checks passed; whitespace check exited 0 with expected CRLF warnings.
+Date: 2026-07-12
+
+Stabilization live provider test:
+Command: python main.py
+Result: User ran a live Gemini session. Metadata-only inspection of session daeedeaf-d519-4334-aab2-6a8eb1a0dacf parsed 11 JSONL records: 10 successes and 1 handled failure. Eight interactions retried, seven recovered after retry, and one status 500 exhausted 3 attempts and 2 retries. Every record contained the provider diagnostic fields.
+Date: 2026-07-11
+```
+
 ## Deferred Or Waived Items
 
 Any incomplete item must be listed here before Phase 1 can exit.
@@ -945,5 +1002,5 @@ Phase 1 exit is approved only when the following is true:
 Phase 1 exit approved: yes
 Approved by: Kaelion
 Date: 2026-07-10
-Notes: Approved after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed.
+Notes: Original approval after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed. See `Post-Exit Phase 1 Stabilization` for the 2026-07-11 in-scope maintenance record.
 ```

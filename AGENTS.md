@@ -90,6 +90,8 @@ Use these defaults unless `PHASE_1.md` is deliberately updated:
 - Log location: local filesystem only.
 - Exit commands: `/exit` and `/quit`.
 - Provider timeout: 30 seconds.
+- Provider maximum retries: 2, configurable from 0 through 2.
+- Provider retry base delay: 3 seconds, configurable from 0 through 10 seconds.
 
 ## Architecture Rules
 
