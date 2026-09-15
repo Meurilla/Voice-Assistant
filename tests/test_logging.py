@@ -148,6 +148,33 @@ class LoggingTests(unittest.TestCase):
                     error_type="ProviderUnavailableError",
                 )
 
+    def test_log_interaction_preserves_unicode_and_escapes_unpaired_surrogates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_file = Path(temp_dir) / "interactions.jsonl"
+            secret = "configured-secret"
+            logger = InteractionLogger(log_file, secrets=(secret,))
+            texts = ["caf\u00e9 \U0001f642", "bad\ud800text", "bad\udffftext", 'line\n"two"\\end']
+
+            for text in texts:
+                logger.log_interaction(
+                    session_id="session-1",
+                    user_input=f"{text} {secret}",
+                    assistant_response=text,
+                    provider_name="gemini",
+                    success=True,
+                    provider_error_message=text,
+                )
+
+            log_text = log_file.read_text(encoding="utf-8")
+            self.assertNotIn(secret, log_text)
+            self.assertIn(texts[0], log_text)
+            records = [json.loads(line) for line in log_text.splitlines()]
+            self.assertEqual(len(records), len(texts))
+            for record, text in zip(records, texts, strict=True):
+                self.assertEqual(record["user_input"], f"{text} [REDACTED_API_KEY]")
+                self.assertEqual(record["assistant_response"], text)
+                self.assertEqual(record["provider_error_message"], text)
+
 
 if __name__ == "__main__":
     unittest.main()

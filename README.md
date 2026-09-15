@@ -10,6 +10,8 @@ Phase 1 is complete and signed off. The project has a CLI-only, text-only assist
 
 On 2026-07-11 and 2026-07-12, Phase 1 received in-scope stabilization updates covering bounded provider retries, local diagnostics, provider-neutral errors, SDK alignment, complete-turn session limits, request-stage interruption, deterministic provider cleanup, cleanup-failure handling, and expanded tests. These updates did not add Phase 2 scope or change the original 2026-07-10 approval date.
 
+On 2026-09-15, a further Phase 1 hardening pass added clear file-encoding errors, safe logging of malformed Unicode, and expanded offline startup, recovery, logging, shutdown, and SDK transport tests.
+
 Later-phase work must not start until the next phase scope is explicitly documented and approved.
 
 ## What It Does
@@ -49,6 +51,8 @@ If you only want to run the standard-library test suite, installing the optional
 ## Configuration
 
 Non-secret settings live in `config/settings.toml`.
+
+Save both `config/settings.toml` and `config/system_prompt.txt` as UTF-8 text. Invalid encoding produces a startup error identifying the file.
 
 Defaults in the scaffold:
 
@@ -94,6 +98,8 @@ Phase 1 deliberately uses Python's standard-library `unittest`. The contract per
 python -m unittest discover -s tests
 ```
 
+Tests use fake providers or an in-memory HTTP transport with the real Gemini SDK; they do not contact Gemini or require a real API key. The transport tests use `httpx`, already installed as a dependency of `google-genai`. SDK transport behavior was verified with `google-genai` 1.75.0; the full allowed version range has not been tested.
+
 Optional lint command after installing development dependencies:
 
 ```powershell
@@ -104,6 +110,8 @@ python -m ruff check .
 
 Runtime logs are written locally as JSONL to `logs/interactions.jsonl` by default. Each line is one interaction record with timestamp, session ID, user input, assistant response when available, provider name, success state, error type when applicable, provider attempt and retry counts, final error status code when available, sanitized provider error detail, and total provider elapsed time in milliseconds. Elapsed time includes retry delays.
 
+Valid Unicode remains readable in the UTF-8 log. Unpaired surrogate characters are written as JSON Unicode escapes so malformed text cannot interrupt logging. Filesystem write failures produce a warning while preserving a successful assistant reply.
+
 Phase 1 logs may include conversation text. Before writing JSONL, the logger redacts the loaded API key and Google API-key-shaped text from user, assistant, and provider-error fields. Provider error detail is also sanitized and limited to 500 characters by the adapter. These are safety guards, not general-purpose secret management; avoid pasting secrets into the assistant because they may still be sent to the configured provider during the live request.
 
 Logs must never include API keys, raw environment dumps, or unnecessary system information. Runtime logs are ignored by git; `logs/.gitkeep` exists only to keep the directory.
@@ -112,6 +120,7 @@ Logs must never include API keys, raw environment dumps, or unnecessary system i
 
 - Missing config: confirm `config/settings.toml` exists.
 - Missing prompt: confirm `config/system_prompt.txt` exists.
+- Invalid file encoding: save the identified config or prompt file as UTF-8 instead of UTF-16 or a legacy encoding.
 - Missing API key: set the environment variable named by `api_key_env_var`.
 - Invalid config: check that numeric values are integers rather than booleans, `session_history_max_messages` is positive and even, `provider_max_retries` is from 0 through 2, `provider_retry_delay_seconds` is from 0 through 10, and `provider_name` is `gemini`.
 - Provider authentication failed: check that `GEMINI_API_KEY` is set and valid.

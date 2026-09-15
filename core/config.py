@@ -43,6 +43,8 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> RuntimeConfig:
 
     try:
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ConfigurationError(f"Config file must use UTF-8 encoding: {config_path}") from exc
     except tomllib.TOMLDecodeError as exc:
         raise ConfigurationError(f"Invalid TOML in {config_path}: {exc}") from exc
     except OSError as exc:
@@ -89,6 +91,8 @@ def load_system_prompt(path: Path) -> str:
         raise ConfigurationError(f"Missing system prompt file: {path}")
     try:
         prompt = path.read_text(encoding="utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ConfigurationError(f"System prompt file must use UTF-8 encoding: {path}") from exc
     except OSError as exc:
         raise ConfigurationError(f"Could not read system prompt file {path}: {exc}") from exc
     if not prompt:

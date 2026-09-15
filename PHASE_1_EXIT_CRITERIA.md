@@ -160,9 +160,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Invalid config produces a clear startup error.
-  - Evidence: `tests/test_config.py::test_load_config_rejects_invalid_values` verifies invalid values, including TOML booleans for integer fields and odd history limits, raise `ConfigurationError` with specific messages.
-  - Date: 2026-07-12
-  - Notes: `interfaces/cli.py::run` catches `AssistantError` and prints startup errors.
+  - Evidence: Config tests verify invalid values and invalid UTF-8 raise `ConfigurationError`; `test_run_reports_invalid_file_encoding_without_starting_provider` verifies config and prompt decoding failures return code 1 with a specific startup error before provider construction.
+  - Date: 2026-09-15
+  - Notes: `interfaces/cli.py::run` catches `AssistantError` and prints startup errors. UTF-16 files are rejected with instructions to use UTF-8.
 - [x] Missing prompt file produces a clear startup error.
   - Evidence: `tests/test_cli.py::test_run_reports_missing_prompt_file_startup_error`.
   - Date: 2026-07-08
@@ -341,9 +341,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Log write failure is handled cleanly.
-  - Evidence: `InteractionLogger` raises `LogWriteError`; `Assistant._try_log` returns the user-facing log error instead of crashing; tests cover logging failure on direct logger use, successful provider replies, and provider-error replies.
-  - Date: 2026-07-09
-  - Notes: Provider-error plus log-write failure now surfaces both the provider error and the log-write error through the CLI.
+  - Evidence: `test_assistant_preserves_successful_reply_when_logging_fails` verifies the reply and history survive a write failure; `test_run_displays_successful_reply_and_log_warning_before_eof` verifies reply output, warning, EOF exit, and provider cleanup. Existing tests cover direct logger and provider-error write failures.
+  - Date: 2026-09-15
+  - Notes: This pass added the previously missing successful-reply coverage claimed by the earlier evidence. Surrogate logging is covered by `test_log_interaction_preserves_unicode_and_escapes_unpaired_surrogates`.
 - [x] Logs do not include API keys.
   - Evidence: Logger redacts configured secrets and Google API-key-shaped text; tests cover both paths; local log inspection found zero API-key-shaped leaks.
   - Date: 2026-07-08
@@ -412,8 +412,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-12
   - Notes: `KeyboardInterrupt` remains uncaught by the provider and is handled at the CLI loop boundary.
 - [x] Log write failure handled cleanly.
-  - Evidence: Logging failure tests cover `LogWriteError`, successful provider replies, provider-error replies, and CLI output of attached log-write failures.
-  - Date: 2026-07-09
+  - Evidence: Logging failure tests cover `LogWriteError`, provider-error replies, and CLI output of attached log-write failures. Added assistant and CLI tests now explicitly verify successful replies remain available when logging fails.
+  - Date: 2026-09-15
   - Notes:
 - [x] User-facing error messages are specific enough to act on.
   - Evidence: Startup, config, validation, provider auth, rate-limit, timeout, and unavailable messages are specific in `core/errors.py`, `core/config.py`, `core/safety.py`, and `providers/gemini_provider.py`.
@@ -467,8 +467,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Prompt loading is tested.
-  - Evidence: `tests/test_config.py::test_load_system_prompt_reads_text` and `test_load_system_prompt_rejects_missing_file`.
-  - Date: 2026-07-08
+  - Evidence: `tests/test_config.py` covers valid text, missing files, empty and whitespace-only prompts, and invalid UTF-8 including UTF-16 input.
+  - Date: 2026-09-15
   - Notes:
 - [x] `/exit` command behavior is tested.
   - Evidence: `tests/test_cli.py::test_run_loop_exits_on_exit_command`.
@@ -495,8 +495,8 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] Logging failure is tested.
-  - Evidence: `tests/test_logging.py::test_log_interaction_reports_write_failure`, `tests/test_assistant.py::test_assistant_attaches_log_failure_to_provider_error`, and `tests/test_cli.py::test_run_loop_prints_log_failure_after_provider_error`.
-  - Date: 2026-07-09
+  - Evidence: Direct logger and provider-error failure tests are supplemented by `test_assistant_preserves_successful_reply_when_logging_fails` and `test_run_displays_successful_reply_and_log_warning_before_eof`.
+  - Date: 2026-09-15
   - Notes:
 - [x] JSONL log formatting is tested.
   - Evidence: `tests/test_logging.py::test_log_interaction_writes_jsonl_record` parses the written line with `json.loads`.
@@ -507,9 +507,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-12
   - Notes: A normal cleanup failure prints a generic message and returns `1`; an active loop exception is preserved when cleanup also fails. `test_run_closes_gemini_provider_client_after_shutdown` verifies the SDK client fake is closed.
 - [x] Tests do not depend on execution order.
-  - Evidence: Full discovery run passed with `python -m unittest discover -s tests`.
-  - Date: 2026-07-08
-  - Notes:
+  - Evidence: All 64 tests passed in normal discovery order and in a flattened `unittest.TestSuite` shuffled with `random.Random(20260915)`.
+  - Date: 2026-09-15
+  - Notes: One reproducible shuffled order was checked; this is not an exhaustive check of every ordering.
 - [x] Tests do not depend on a real API key.
   - Evidence: Tests use fakes, mocks, and patched environment variables; full test run passed without requiring a real key.
   - Date: 2026-07-08
@@ -802,9 +802,9 @@ If an item is intentionally skipped, it must be documented under `Deferred Or Wa
   - Date: 2026-07-08
   - Notes:
 - [x] The assistant can recover from a provider error and continue when appropriate.
-  - Evidence: User observed a transient Gemini `500 INTERNAL` provider error; provider tests verify up to two retries with 3-second and 6-second backoff, and CLI tests verify control returns to the input loop after exhaustion.
-  - Date: 2026-07-11
-  - Notes: Retry remains provider-local and bounded; it is not provider fallback.
+  - Evidence: `test_run_recovers_after_provider_failure_and_exits_cleanly` drives real startup, assistant, session, logging, and CLI code through success, provider failure, recovery, and exit. It verifies failed turns are excluded from the next request, all three interactions are logged, and provider cleanup runs. SDK mock-transport tests cover bounded transient retries and no retry on rate limits.
+  - Date: 2026-09-15
+  - Notes: Providers or HTTP transport are faked; no live request is required. Retry remains provider-local and bounded; it is not provider fallback.
 - [x] The assistant can exit without corrupting logs.
   - Evidence: User confirmed `/exit` and `/quit` manual checks passed; local log inspection parsed all 12 lines as valid JSONL records.
   - Date: 2026-07-08
@@ -990,6 +990,44 @@ Result: User ran a live Gemini session. Metadata-only inspection of session daee
 Date: 2026-07-11
 ```
 
+### Encoding And Recovery Hardening (2026-09-15)
+
+This in-scope pass addressed two reproduced encoding failures and reconciled test evidence with the current suite. Config and prompt files containing invalid UTF-8 now raise `ConfigurationError` with a file-specific UTF-8 instruction. JSONL writes escape unpaired surrogate characters while preserving readable valid Unicode and existing secret redaction.
+
+Added tests cover invalid config/prompt encodings (including UTF-16), empty prompts, successful replies surviving filesystem log failures, CLI success/failure/recovery with failed-turn exclusion, EOF shutdown and cleanup, and real SDK request serialization and retry behavior through an in-memory HTTP transport. No runtime dependency, retry policy, phase scope, or original approval date changed.
+
+```text
+Automated regression tests:
+Command: .\.venv\Scripts\python.exe -m unittest discover -s tests
+Result: OK, 64 tests passed (10 added). Encoding regressions failed before the fixes and passed afterward.
+
+Test-order check:
+Method: Flatten unittest discovery, shuffle with random.Random(20260915), run with TextTestRunner.
+Result: All 64 tests passed.
+
+Lint:
+Command: .\.venv\Scripts\python.exe -m ruff check .
+Result: All checks passed.
+
+Format:
+Command: .\.venv\Scripts\python.exe -m ruff format --check .
+Result: 20 files already formatted.
+
+Whitespace:
+Command: git diff --check
+Result: Passed; only Git LF-to-CRLF normalization warnings.
+
+Offline CLI smoke checks:
+Method: Call run() with fake environment credentials and controlled stdin; use a temporary invalid-encoding config for the startup failure case.
+Result: /exit and EOF returned 0 with Goodbye.; invalid config encoding returned 1 with a UTF-8 startup error. No provider request was made.
+
+SDK transport checks:
+Environment: Installed google-genai 1.75.0, using its existing httpx dependency and MockTransport.
+Result: Serialized system prompt, history roles, thinking level, model path, and 30-second read timeout verified. HTTP 500 then 503 then success caused exactly 3 attempts with simulated 3/6-second backoff. HTTP 429 caused exactly 1 attempt and no retry.
+Limits: No live Gemini request, fresh installation, SDK version matrix, or type checking performed. No type checker is configured.
+Date: 2026-09-15
+```
+
 ## Deferred Or Waived Items
 
 Any incomplete item must be listed here before Phase 1 can exit.
@@ -1017,5 +1055,5 @@ Phase 1 exit is approved only when the following is true:
 Phase 1 exit approved: yes
 Approved by: Kaelion
 Date: 2026-07-10
-Notes: Original approval after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed. See `Post-Exit Phase 1 Stabilization` for subsequent in-scope maintenance records through 2026-07-12.
+Notes: Original approval after final manual smoke test, log inspection, full automated tests, Ruff lint, Ruff format check, and whitespace check passed. See `Post-Exit Phase 1 Stabilization` for subsequent in-scope maintenance records through 2026-09-15.
 ```

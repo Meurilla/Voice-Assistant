@@ -1,9 +1,13 @@
 """Tests for Gemini request mapping, retry behavior, and error handling."""
 
+import json
 import unittest
 from collections.abc import Sequence
 from typing import Any
+from unittest.mock import patch
 
+import httpx
+from google import genai
 from google.genai import errors as genai_errors
 
 from core.errors import (
@@ -104,6 +108,112 @@ class StatusError(Exception):
 
 class GeminiProviderTests(unittest.TestCase):
     """Coverage for Gemini provider success, retries, and status mapping."""
+
+    def test_real_sdk_serializes_request_and_retries_through_mock_transport(self) -> None:
+        requests: list[httpx.Request] = []
+        sleep_calls: list[float] = []
+        statuses = [500, 503, 200]
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            status = statuses[len(requests)]
+            requests.append(request)
+            if status != 200:
+                return httpx.Response(status, json={"error": {"code": status, "message": "retry"}})
+            return httpx.Response(
+                200,
+                json={"candidates": [{"content": {"role": "model", "parts": [{"text": "ok"}]}}]},
+            )
+
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            httpx.Client(transport=httpx.MockTransport(respond), trust_env=False) as http_client,
+            genai.Client(
+                api_key="fake-api-key",
+                vertexai=False,
+                http_options={"httpx_client": http_client},
+            ) as client,
+        ):
+            provider = GeminiProvider(
+                api_key="fake-api-key",
+                model="gemma-4-31b-it",
+                thinking_level="minimal",
+                client=client,
+                sleep_func=sleep_calls.append,
+            )
+
+            response = provider.generate_response(
+                system_prompt="system prompt",
+                messages=[
+                    ConversationMessage(role="user", content="hello"),
+                    ConversationMessage(role="assistant", content="hi"),
+                    ConversationMessage(role="user", content="next"),
+                ],
+                timeout_seconds=30,
+            )
+
+        self.assertEqual(response, "ok")
+        self.assertEqual(len(requests), 3)
+        self.assertEqual(sleep_calls, [3, 6])
+        self.assertEqual(provider.last_request_metadata.attempt_count, 3)
+        self.assertEqual(provider.last_request_metadata.retry_count, 2)
+        self.assertIsNone(provider.last_request_metadata.final_status_code)
+        for request in requests:
+            self.assertEqual(request.method, "POST")
+            self.assertTrue(request.url.path.endswith("/models/gemma-4-31b-it:generateContent"))
+            self.assertEqual(request.extensions["timeout"]["read"], 30)
+            body = json.loads(request.content)
+            self.assertEqual(body["systemInstruction"]["parts"], [{"text": "system prompt"}])
+            self.assertEqual(
+                body["contents"],
+                [
+                    {"role": "user", "parts": [{"text": "hello"}]},
+                    {"role": "model", "parts": [{"text": "hi"}]},
+                    {"role": "user", "parts": [{"text": "next"}]},
+                ],
+            )
+            thinking_config = body["generationConfig"]["thinkingConfig"]
+            # SDK versions may serialize protobuf fields using either JSON spelling.
+            thinking_level = thinking_config.get(
+                "thinkingLevel", thinking_config.get("thinking_level")
+            )
+            self.assertEqual(thinking_level, "MINIMAL")
+
+    def test_real_sdk_rate_limit_is_not_retried(self) -> None:
+        requests: list[httpx.Request] = []
+        sleep_calls: list[float] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(429, json={"error": {"code": 429, "message": "rate limited"}})
+
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            httpx.Client(transport=httpx.MockTransport(respond), trust_env=False) as http_client,
+            genai.Client(
+                api_key="fake-api-key",
+                vertexai=False,
+                http_options={"httpx_client": http_client},
+            ) as client,
+        ):
+            provider = GeminiProvider(
+                api_key="fake-api-key",
+                model="gemma-4-31b-it",
+                thinking_level="minimal",
+                client=client,
+                sleep_func=sleep_calls.append,
+            )
+            with self.assertRaises(ProviderRateLimitError):
+                provider.generate_response(
+                    system_prompt="system prompt",
+                    messages=[ConversationMessage(role="user", content="hello")],
+                    timeout_seconds=30,
+                )
+
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(sleep_calls, [])
+        self.assertEqual(provider.last_request_metadata.attempt_count, 1)
+        self.assertEqual(provider.last_request_metadata.retry_count, 0)
+        self.assertEqual(provider.last_request_metadata.final_status_code, 429)
 
     def test_init_rejects_retry_values_outside_phase_one_limits(self) -> None:
         cases = [

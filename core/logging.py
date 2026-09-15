@@ -57,7 +57,8 @@ class InteractionLogger:
 
         try:
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
-            with self.log_file.open("a", encoding="utf-8") as handle:
+            # UTF-8 backslash replacement escapes lone surrogates as JSON-compatible \uXXXX.
+            with self.log_file.open("a", encoding="utf-8", errors="backslashreplace") as handle:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         except OSError as exc:
             raise LogWriteError(f"Could not write interaction log: {exc}") from exc

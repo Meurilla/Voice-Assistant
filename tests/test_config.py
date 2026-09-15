@@ -38,6 +38,16 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(MissingConfigError):
             load_config(Path("does-not-exist.toml"))
 
+    def test_load_config_rejects_invalid_encoding(self) -> None:
+        cases = (("utf-16", _valid_settings().encode("utf-16")), ("invalid", b"\xffinvalid"))
+        for label, data in cases:
+            with self.subTest(encoding=label), tempfile.TemporaryDirectory() as temp_dir:
+                settings = Path(temp_dir) / "settings.toml"
+                settings.write_bytes(data)
+
+                with self.assertRaisesRegex(ConfigurationError, "must use UTF-8 encoding"):
+                    load_config(settings)
+
     def test_load_config_rejects_invalid_integer(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -163,6 +173,24 @@ class ConfigTests(unittest.TestCase):
                 load_system_prompt(prompt)
 
             self.assertIn("Missing system prompt file", str(context.exception))
+
+    def test_load_system_prompt_rejects_invalid_encoding(self) -> None:
+        for data in ("hello".encode("utf-16"), b"\xffinvalid"):
+            with self.subTest(data=data), tempfile.TemporaryDirectory() as temp_dir:
+                prompt = Path(temp_dir) / "system_prompt.txt"
+                prompt.write_bytes(data)
+
+                with self.assertRaisesRegex(ConfigurationError, "must use UTF-8 encoding"):
+                    load_system_prompt(prompt)
+
+    def test_load_system_prompt_rejects_empty_text(self) -> None:
+        for text in ("", " \n\t "):
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as temp_dir:
+                prompt = Path(temp_dir) / "system_prompt.txt"
+                prompt.write_text(text, encoding="utf-8")
+
+                with self.assertRaisesRegex(ConfigurationError, "must not be empty"):
+                    load_system_prompt(prompt)
 
     def test_load_api_key_reads_environment_variable(self) -> None:
         with patch.dict("os.environ", {"GEMINI_API_KEY": "secret"}, clear=True):

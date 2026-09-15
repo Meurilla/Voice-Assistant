@@ -2,14 +2,18 @@
 
 import contextlib
 import io
+import json
 import tempfile
 import textwrap
 import unittest
+from functools import partial
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from core.errors import ProviderUnavailableError
+from core.session import ConversationMessage
 from interfaces.cli import run, run_loop
+from providers.base import LLMProvider, ProviderRequestMetadata
 from providers.gemini_provider import GeminiModelsClient, GeminiProvider
 
 
@@ -30,6 +34,129 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 1)
             self.assertIn("Startup error: Missing system prompt file", stderr.getvalue())
+
+    def test_run_reports_invalid_file_encoding_without_starting_provider(self) -> None:
+        for filename, label in (
+            ("settings.toml", "Config file"),
+            ("system_prompt.txt", "System prompt file"),
+        ):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as temp_dir:
+                config_dir = Path(temp_dir) / "config"
+                config_dir.mkdir()
+                settings = config_dir / "settings.toml"
+                settings.write_text(_valid_settings(), encoding="utf-8")
+                (config_dir / "system_prompt.txt").write_text("prompt", encoding="utf-8")
+                invalid_file = config_dir / filename
+                invalid_file.write_bytes(b"\xffinvalid")
+                stderr = io.StringIO()
+
+                with (
+                    patch("interfaces.cli.GeminiProvider") as provider_factory,
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = run(settings)
+
+                self.assertEqual(exit_code, 1)
+                self.assertEqual(
+                    stderr.getvalue().strip(),
+                    f"Startup error: {label} must use UTF-8 encoding: {invalid_file}",
+                )
+                provider_factory.assert_not_called()
+
+    def test_run_recovers_after_provider_failure_and_exits_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / "config"
+            config_dir.mkdir()
+            settings = config_dir / "settings.toml"
+            settings.write_text(_valid_settings(), encoding="utf-8")
+            (config_dir / "system_prompt.txt").write_text("system prompt", encoding="utf-8")
+            provider = Mock(spec=LLMProvider)
+            provider.name = "gemini"
+            provider.last_request_metadata = ProviderRequestMetadata(attempt_count=1)
+            provider.generate_response.side_effect = [
+                "first response",
+                ProviderUnavailableError(),
+                "recovered response",
+            ]
+            inputs = iter(["first request", "failed request", "next request", "/exit"])
+            outputs: list[str] = []
+            errors: list[str] = []
+
+            with (
+                patch.dict("os.environ", {"GEMINI_API_KEY": "fake-api-key"}, clear=True),
+                patch("interfaces.cli.GeminiProvider", return_value=provider),
+                patch(
+                    "interfaces.cli.run_loop",
+                    side_effect=partial(
+                        run_loop,
+                        input_func=lambda prompt: next(inputs),
+                        output_func=outputs.append,
+                        error_func=errors.append,
+                    ),
+                ),
+            ):
+                exit_code = run(settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(outputs, ["first response", "recovered response", "Goodbye."])
+            self.assertEqual(errors, ["I've encountered an error. Please retry."])
+            self.assertEqual(provider.generate_response.call_count, 3)
+            provider.close.assert_called_once_with()
+            self.assertEqual(
+                provider.generate_response.call_args.kwargs["messages"],
+                (
+                    ConversationMessage(role="user", content="first request"),
+                    ConversationMessage(role="assistant", content="first response"),
+                    ConversationMessage(role="user", content="next request"),
+                ),
+            )
+            log_text = (root / "logs/interactions.jsonl").read_text(encoding="utf-8")
+            records = [json.loads(line) for line in log_text.splitlines()]
+            self.assertEqual([record["success"] for record in records], [True, False, True])
+            self.assertEqual(records[1]["error_type"], "ProviderUnavailableError")
+            self.assertIsNone(records[1]["assistant_response"])
+            self.assertEqual(len({record["session_id"] for record in records}), 1)
+
+    def test_run_displays_successful_reply_and_log_warning_before_eof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_dir = Path(temp_dir) / "config"
+            config_dir.mkdir()
+            settings = config_dir / "settings.toml"
+            # An existing directory is a deterministic invalid log-file destination.
+            settings.write_text(
+                _valid_settings().replace("logs/interactions.jsonl", "config"),
+                encoding="utf-8",
+            )
+            (config_dir / "system_prompt.txt").write_text("system prompt", encoding="utf-8")
+            provider = Mock(spec=LLMProvider)
+            provider.name = "gemini"
+            provider.last_request_metadata = ProviderRequestMetadata(attempt_count=1)
+            provider.generate_response.return_value = "successful reply"
+            outputs: list[str] = []
+
+            with (
+                patch.dict("os.environ", {"GEMINI_API_KEY": "fake-api-key"}, clear=True),
+                patch("interfaces.cli.GeminiProvider", return_value=provider),
+                patch(
+                    "interfaces.cli.run_loop",
+                    side_effect=partial(
+                        run_loop,
+                        input_func=Mock(side_effect=["hello", EOFError()]),
+                        output_func=outputs.append,
+                        error_func=outputs.append,
+                    ),
+                ),
+            ):
+                exit_code = run(settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(len(outputs), 4)
+            self.assertEqual(outputs[0], "successful reply")
+            self.assertTrue(outputs[1].startswith("Could not write interaction log:"))
+            self.assertEqual(outputs[2:], ["", "Goodbye."])
+            provider.generate_response.assert_called_once()
+            provider.close.assert_called_once_with()
 
     def test_run_closes_assistant_after_loop_exit(self) -> None:
         assistant = _ClosableAssistant()

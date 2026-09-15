@@ -183,6 +183,23 @@ class AssistantTests(unittest.TestCase):
             self.assertIn("Could not write interaction log", context.exception.log_error)
             self.assertEqual(len(assistant.session.messages), 0)
 
+    def test_assistant_preserves_successful_reply_when_logging_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            provider = FakeProvider(response="hello back")
+            assistant = _assistant(Path(temp_dir), provider)
+
+            reply = assistant.handle_user_input("hello")
+
+            self.assertEqual(reply.text, "hello back")
+            self.assertIn("Could not write interaction log", reply.log_error or "")
+            self.assertEqual(
+                assistant.session.messages,
+                (
+                    ConversationMessage(role="user", content="hello"),
+                    ConversationMessage(role="assistant", content="hello back"),
+                ),
+            )
+
     def test_assistant_redacts_secret_from_logged_conversation_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_file = Path(temp_dir) / "interactions.jsonl"
