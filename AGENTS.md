@@ -2,9 +2,9 @@
 
 ## Project State
 
-This project is in Phase 1.
+This project is in Phase 2 scope/evaluation, following the approved Phase 1 exit. The runtime still implements the Phase 1 text assistant until Phase 2 changes are delivered and verified.
 
-The current objective is to build a small, robust, text-first command-line assistant core. Do not expand the project beyond Phase 1 unless the user explicitly updates the phase contract.
+The current objective is controlled English voice input on Windows with a portable core, initially evaluating one free cloud STT service. Voice output is reserved for Phase 3. See `PHASE_2.md` and `PHASE_2_EXIT_CRITERIA.md`.
 
 ## Required Reading
 
@@ -13,10 +13,26 @@ Before making any code, configuration, dependency, or documentation change, read
 1. `PHASE_1.md`
 2. `PHASE_1_EXIT_CRITERIA.md`
 3. `AGENTS.md`
+4. `PHASE_2.md`
+5. `PHASE_2_EXIT_CRITERIA.md`
 
 Treat `PHASE_1.md` as the source of truth for Phase 1 scope.
 
 Treat `PHASE_1_EXIT_CRITERIA.md` as the source of truth for Phase 1 completion.
+
+Treat `PHASE_2.md` as the active scope contract and `PHASE_2_EXIT_CRITERIA.md` as its completion gate. The Phase 1 sections below preserve the baseline rules. Only the explicit Phase 2 additions supersede their prohibitions on speech input, audio dependencies, and a separate STT service. All other safeguards and exclusions remain in force.
+
+## Phase 2 Rules
+
+- Keep Gemini as the sole conversation provider; one STT service may convert audio to text.
+- Start with the free cloud evaluation in `PHASE_2.md`; do not enable paid usage.
+- Keep recording deliberate, bounded and separate from transcript review and assistant requests.
+- Require transcript acceptance before Gemini submission; rejected or failed transcription must not update history.
+- Keep text mode usable without speech credentials, audio packages, or hardware.
+- Isolate platform-specific capture details; do not claim other platforms are supported before testing them.
+- Permit only narrowly justified optional speech dependencies documented before installation.
+- Keep secrets environment-based, redact both service keys, and retain no raw audio by default.
+- Do not implement voice output or other later-phase capabilities.
 
 ## Core Rule
 
@@ -110,7 +126,7 @@ The provider implementation must not contain CLI behavior.
 
 The assistant core must be testable without live network calls.
 
-Do not add new directories or architectural layers unless they clearly support Phase 1.
+Do not add new directories or architectural layers unless they clearly support the active phase contract.
 
 ## Dependency Rules
 
@@ -270,13 +286,13 @@ The README must eventually explain:
 
 ## Phase Progression
 
-No Phase 2 work may begin until:
+The Phase 2 entry requirements are:
 
 1. `PHASE_1_EXIT_CRITERIA.md` is complete or explicitly waived item by item.
 2. The user approves moving beyond Phase 1.
 3. The new phase scope is documented.
 
-Do not let later-phase ideas leak into Phase 1 implementation.
+Phase 1 exit and the user's Phase 2 direction are recorded in the phase documents. Before Phase 3 begins, complete or explicitly waive Phase 2 exit items, obtain approval to start Phase 3, and document its scope. Voice output is a roadmap direction only until then.
 
 ## Response Expectations
 

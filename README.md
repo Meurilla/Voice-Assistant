@@ -2,7 +2,13 @@
 
 This repository contains the completed Phase 1 text-first command-line assistant foundation.
 
-Phase 1 is governed by `PHASE_1.md` and was approved in `PHASE_1_EXIT_CRITERIA.md` on 2026-07-10. No Phase 2 work has started.
+Phase 1 is governed by `PHASE_1.md` and was approved in `PHASE_1_EXIT_CRITERIA.md` on 2026-07-10. Phase 2 scope and evaluation are now documented; the runtime remains text-only.
+
+## Phase 2 Direction
+
+On 2026-09-16, the agreed direction became controlled English voice input on Windows with a portable core. [PHASE_2.md](PHASE_2.md) defines scope, the first free cloud STT candidate (Groq Whisper Large V3), account setup, privacy, and the recording evaluation plan. [PHASE_2_EXIT_CRITERIA.md](PHASE_2_EXIT_CRITERIA.md) tracks verification. Voice output is reserved for a separate Phase 3.
+
+No voice command or speech dependency is implemented yet. The setup and run instructions below apply to the existing text assistant. Account setup and live speech testing remain outstanding.
 
 ## Phase 1 Status
 
