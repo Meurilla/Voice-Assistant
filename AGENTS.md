@@ -1,306 +1,83 @@
 # Project Agent Instructions
 
-## Project State
+## Current State And Required Reading
 
-This project is in Phase 2 scope/evaluation, following the approved Phase 1 exit. The runtime still implements the Phase 1 text assistant until Phase 2 changes are delivered and verified.
+The active phase is Phase 2: controlled English voice input on Windows with a portable core. The runtime remains the completed text assistant until voice input is implemented and verified. Voice output belongs to Phase 3.
 
-The current objective is controlled English voice input on Windows with a portable core, initially evaluating one free cloud STT service. Voice output is reserved for Phase 3. See `PHASE_2.md` and `PHASE_2_EXIT_CRITERIA.md`.
+Before code, configuration, dependency, or documentation changes, read:
 
-## Required Reading
+1. `AGENTS.md`.
+2. [PHASE_2.md](PHASE_2.md), the active scope and CLI/audio contract.
+3. [PHASE_2_EXIT_CRITERIA.md](PHASE_2_EXIT_CRITERIA.md), the completion gate.
 
-Before making any code, configuration, dependency, or documentation change, read:
+For compatibility decisions, consult the completed [Phase 1 contract](phases/phase_1/PHASE_1.md) and [exit evidence](phases/phase_1/PHASE_1_EXIT_CRITERIA.md). These record the historical baseline, not current feature prohibitions.
 
-1. `PHASE_1.md`
-2. `PHASE_1_EXIT_CRITERIA.md`
-3. `AGENTS.md`
-4. `PHASE_2.md`
-5. `PHASE_2_EXIT_CRITERIA.md`
+## Phase Documents And History
 
-Treat `PHASE_1.md` as the source of truth for Phase 1 scope.
+Keep the current phase contract and exit criteria, `AGENTS.md`, and README at the repository root. Archive completed phase documents under `phases/phase_<number>/` when the next phase is approved and documented.
 
-Treat `PHASE_1_EXIT_CRITERIA.md` as the source of truth for Phase 1 completion.
+Archived documents are immutable history. Preserve their contents, dates, evidence, and historical path references. Update active documents to link to the archive; record new decisions and compatibility amendments in the active contract instead of rewriting completed phases.
 
-Treat `PHASE_2.md` as the active scope contract and `PHASE_2_EXIT_CRITERIA.md` as its completion gate. The Phase 1 sections below preserve the baseline rules. Only the explicit Phase 2 additions supersede their prohibitions on speech input, audio dependencies, and a separate STT service. All other safeguards and exclusions remain in force.
+## Scope Boundaries
 
-## Phase 2 Rules
+- Implement only the controlled recording, transcription evaluation, transcript review, and text handoff defined in `PHASE_2.md`.
+- Use Gemini as the sole conversation provider and one selected cloud STT service for audio-to-text conversion. Keep the trial on the Free tier.
+- Keep typed input usable without speech credentials, audio dependencies, or a microphone.
+- Follow the exact CLI state/command table and frozen audio format. Verify the real Windows capture path before collecting the 25-sample evaluation.
+- Do not claim support for other platforms without testing; isolate platform-specific behavior.
+- No voice output, wake words, always-listening behavior, streaming conversations, global keyboard hooks, GUI, web UI, mobile app, Home Assistant, computer control, tool calling, agents, background automation, scheduling, long-term memory, retrieval, multi-provider routing/fallback, plugins, self-modification, external databases/storage, or application user accounts.
+- No expanded personality system, logging levels, or configurable redaction system without an explicit scope revision.
+- Park out-of-scope ideas for later. Do not implement them until the user revises the active contract.
 
-- Keep Gemini as the sole conversation provider; one STT service may convert audio to text.
-- Start with the free cloud evaluation in `PHASE_2.md`; do not enable paid usage.
-- Keep recording deliberate, bounded and separate from transcript review and assistant requests.
-- Require transcript acceptance before Gemini submission; rejected or failed transcription must not update history.
-- Keep text mode usable without speech credentials, audio packages, or hardware.
-- Isolate platform-specific capture details; do not claim other platforms are supported before testing them.
-- Permit only narrowly justified optional speech dependencies documented before installation.
-- Keep secrets environment-based, redact both service keys, and retain no raw audio by default.
-- Do not implement voice output or other later-phase capabilities.
+## Compatibility Baseline
 
-## Core Rule
+Preserve existing text behavior unless an active-contract change explicitly requires otherwise:
 
-Do not build "Jarvis" in Phase 1.
+- One local TOML config, separate editable system prompt, environment-variable secrets.
+- Default history: 10 conversation messages excluding the system prompt; positive even limits, complete turns only, failed provider turns excluded.
+- Default maximum input length: 8,000 characters.
+- Gemini timeout: 30 seconds; retries: 2, configurable 0-2; base delay: 3 seconds, configurable 0-10. Retry only transient 500/503 responses with bounded exponential backoff.
+- Local JSONL interaction logging, secret redaction, and successful replies surviving log-write failure.
+- `/exit`, `/quit`, Ctrl+C and EOF shutdown, deterministic resource cleanup, and cleanup failures reported without replacing an active exception.
 
-Build only the reliable foundation that a future Jarvis-like assistant can safely grow from.
+STT timeout/retry settings are separate from Gemini settings. Rejected or failed speech input must not invoke Gemini or change conversation history.
 
-Phase 1 must stay boring, limited, testable, and maintainable.
+## Architecture And Dependencies
 
-## Phase 1 Scope Boundary
-
-Allowed Phase 1 work:
-
-- Command-line interface.
-- Text input.
-- Text output.
-- One LLM provider.
-- One editable system prompt.
-- One local config file.
-- Basic runtime settings.
-- Environment-variable secret loading.
-- Bounded session history for the current process.
-- Local JSONL interaction logging.
-- Graceful shutdown, including cleanup-failure behavior.
-- Clear error messages.
-- Unit tests.
-- Integration-style tests using fakes or mocks.
-- Manual verification checklist.
-- Documentation for setup, configuration, use, and limitations.
-
-Do not add these in Phase 1:
-
-- Wake word detection.
-- Always-listening microphone behavior.
-- Speech-to-text.
-- Text-to-speech.
-- GUI.
-- Web UI.
-- Mobile app.
-- Browser automation.
-- Computer control.
-- Home Assistant integration.
-- Smart home control.
-- Tool calling.
-- Autonomous agents.
-- Background tasks.
-- Scheduling.
-- Long-term memory.
-- Vector databases.
-- Embeddings.
-- Retrieval-augmented generation.
-- Multi-provider routing.
-- Provider fallback logic.
-- Plugin systems.
-- Self-modifying code.
-- Self-improvement loops.
-- Complex personality systems.
-- External databases.
-- Cloud storage.
-- User accounts.
-
-If a requested change falls outside Phase 1, do not implement it directly. Explain that it is out of scope, suggest recording it for a later phase, and only proceed if the user explicitly revises the Phase 1 contract.
-
-## Phase 1 Defaults
-
-Use these defaults unless `PHASE_1.md` is deliberately updated:
-
-- Session history limit: last 10 conversation messages, excluding the system prompt; configured limits must be positive even integers.
-- Maximum user input length: 8,000 characters.
-- Log format: JSONL, one interaction per line.
-- Log location: local filesystem only.
-- Exit commands: `/exit` and `/quit`.
-- Provider timeout: 30 seconds.
-- Provider maximum retries: 2, configurable from 0 through 2.
-- Provider retry base delay: 3 seconds, configurable from 0 through 10 seconds.
-
-## Architecture Rules
-
-Keep responsibilities separated:
-
-- `interfaces/`: user-facing input and output.
-- `core/`: assistant orchestration, session handling, validation, and errors.
-- `providers/`: external LLM provider adapters.
-- `config/`: local configuration and prompt files.
-- `tests/`: automated verification.
+- `interfaces/`: terminal interaction and isolated microphone/device boundary.
+- `core/`: validation, assistant orchestration, session handling, errors, and local logging.
+- `providers/`: separate conversation and transcription adapters; no CLI behavior.
+- `config/`: local non-secret settings and system prompt.
+- `tests/`: offline verification with fakes/mocks.
 - `logs/`: local runtime logs.
 
-The CLI must not contain provider-specific logic.
+Keep the core independent of audio transport and operating-system APIs. Do not introduce new layers unless they directly support the active scope. Internal capture callbacks/workers may support a foreground recording, but must stop with that operation; they are not background automation.
 
-The provider implementation must not contain CLI behavior.
+Prefer the standard library and existing tooling. Runtime dependencies may include the existing official Gemini client plus narrowly justified optional voice capture/STT dependencies. Text mode must not import or initialize optional speech components unconditionally.
 
-The assistant core must be testable without live network calls.
-
-Do not add new directories or architectural layers unless they clearly support the active phase contract.
-
-## Dependency Rules
-
-Prefer the Python standard library.
-
-Allowed runtime dependency:
-
-- One official LLM client package, if required by the selected provider.
-
-Allowed development dependencies:
-
-- `pytest`
-- `pytest-cov`
-- `ruff`
-- `mypy`, only if type checking is enforced from the start
-
-Do not add agent frameworks, web frameworks, GUI frameworks, speech libraries, vector databases, plugin frameworks, or Home Assistant libraries during Phase 1.
-
-Before adding any dependency, document:
-
-- Why it is needed.
-- Why the standard library is insufficient.
-- Whether it is runtime or development-only.
-- How it affects setup and verification.
+Before adding a dependency, document its purpose, why existing tools/the standard library are insufficient, runtime versus development status, maintenance/security implications, platform support, and setup/verification impact. Use existing `unittest` and Ruff tooling. The allowed development tools remain pytest, pytest-cov and Ruff; add mypy only with an explicit decision to enforce type checking consistently. Do not add frameworks outside the phase scope.
 
 ## Secrets And Privacy
 
-Never hardcode secrets.
+- Never hardcode, print, or log keys or raw environment variables. Examples contain placeholders only.
+- Redact both loaded service keys from diagnostics and logs.
+- Keep logs local JSONL; document conversation-text logging. Do not log raw audio, raw provider payloads, or rejected transcript text.
+- Send audio only through the explicit transcription action and send only accepted text to Gemini.
+- Retain no raw audio by default; follow the contract for temporary-file cleanup and intentional evaluation recordings.
+- Document cloud processing and provider retention separately from local cleanup. Do not imply that deleting local audio deletes cloud data.
 
-API keys must come from environment variables.
+## Workflow And Verification
 
-Do not print or log API keys.
+Before editing, inspect relevant files, related tests and docs, check git status, and give a short plan for non-trivial work. Make small focused changes, preserve unrelated work and safeguards, and update documentation with behavior changes.
 
-Do not dump raw environment variables.
+After editing, re-read the change and run the narrowest meaningful checks. For implementation changes, use unit/integration tests for affected behavior, broader regression tests for shared behavior, configured lint/format/type checks, and a user-facing smoke test where practical.
 
-Logs must be useful for debugging but must not expose secrets or unnecessary system information.
+Automated tests must not require real API keys, microphones, or live network calls by default. Use fake audio devices and STT/Gemini responses. Complete the hardware, failure, privacy, and setup checks in the exit criteria; mark items complete only with evidence and limitations.
 
-Logs must be local only.
+Do not delete data, revert user changes, commit, push, or rewrite git history unless explicitly asked. Keep changes reversible and reviewable.
 
-Logs must use JSONL.
+## Phase Progression And Reporting
 
-Logs may include user and assistant conversation text in Phase 1, but this must be documented clearly.
+Before Phase 3 starts, complete Phase 2 exit criteria or obtain explicit item-by-item waivers, obtain the user's approval to proceed, and document the new scope. Roadmap placement alone does not authorize Phase 3 implementation.
 
-Do not add configurable log redaction or logging levels in Phase 1 unless the phase contract is explicitly revised.
-
-Example config files must use placeholders only.
-
-## Testing Rules
-
-Automated tests are required but not sufficient.
-
-Tests must not require a real API key by default.
-
-Tests must not make live network calls by default.
-
-Provider behavior should be tested with fakes or mocks.
-
-Failure modes must be tested or manually simulated before Phase 1 exit.
-
-When practical, test:
-
-- Config loading.
-- Prompt loading.
-- Missing config.
-- Invalid config.
-- Missing API key.
-- Input validation.
-- Input length validation.
-- Assistant request flow.
-- Session history.
-- Session history truncation at 10 conversation messages.
-- Exit commands `/exit` and `/quit`.
-- Provider success.
-- Provider failure.
-- Provider timeout configuration.
-- Logging success.
-- Logging failure.
-- JSONL log formatting.
-- Graceful shutdown and cleanup-failure behavior.
-
-## Verification Standard
-
-A change is not complete merely because code was edited.
-
-For every implementation change, verify with the narrowest meaningful commands available:
-
-- Unit tests for touched behavior.
-- Broader tests when shared behavior changes.
-- Linting when configured.
-- Type checking when configured.
-- Manual smoke test when behavior is user-facing.
-
-If validation cannot be run, say so clearly and explain what should be run.
-
-Before Phase 2 starts, `PHASE_1_EXIT_CRITERIA.md` must be completed or explicitly waived item by item.
-
-## Development Workflow
-
-Before editing:
-
-1. Inspect the relevant files.
-2. Understand existing structure and naming.
-3. Check related tests and documentation.
-4. Make a short plan for non-trivial changes.
-
-While editing:
-
-1. Make small, focused changes.
-2. Preserve existing behavior unless the task requires changing it.
-3. Avoid unrelated refactors.
-4. Keep code readable and explicit.
-5. Add comments only for non-obvious intent or edge cases.
-
-After editing:
-
-1. Re-read the modified area.
-2. Run relevant validation.
-3. Summarize changed files.
-4. Report validation performed and not performed.
-5. Call out remaining risk or follow-up work.
-
-## Git Rules
-
-Do not commit unless explicitly asked.
-
-Do not push unless explicitly asked.
-
-Do not rewrite history unless explicitly asked and the consequences are clear.
-
-Do not revert user changes unless explicitly asked.
-
-Keep diffs focused and reviewable.
-
-## Documentation Rules
-
-Documentation must match actual behavior.
-
-If behavior, commands, configuration, dependencies, or limitations change, update the relevant documentation in the same task.
-
-The README must eventually explain:
-
-- What the assistant does.
-- What it does not do.
-- Setup.
-- Configuration.
-- Default session history limit.
-- Default maximum user input length.
-- Default provider timeout.
-- Exit commands.
-- Required environment variables.
-- Run command.
-- Test command.
-- Local JSONL logging.
-- Phase 1 conversation-text logging behavior.
-- Troubleshooting.
-- Phase 1 limitations.
-
-## Phase Progression
-
-The Phase 2 entry requirements are:
-
-1. `PHASE_1_EXIT_CRITERIA.md` is complete or explicitly waived item by item.
-2. The user approves moving beyond Phase 1.
-3. The new phase scope is documented.
-
-Phase 1 exit and the user's Phase 2 direction are recorded in the phase documents. Before Phase 3 begins, complete or explicitly waive Phase 2 exit items, obtain approval to start Phase 3, and document its scope. Voice output is a roadmap direction only until then.
-
-## Response Expectations
-
-When reporting completed work, include:
-
-- Files changed.
-- What changed.
-- Why it changed.
-- Validation performed.
-- Validation not performed, if any.
-- Remaining risks or recommended next step.
+Report files changed, what changed and why, validation performed, validation not performed, and remaining risks or next steps. Distinguish planned behavior from working and verified behavior.

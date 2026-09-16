@@ -10,7 +10,8 @@ Mark an item complete only with evidence, date, and relevant limitations. Record
 
 - [ ] Account is on the Free tier; model access, exact quotas and data-retention controls are recorded without secrets.
 - [ ] English language setting and selected model are explicit.
-- [ ] Microphone, recording controls, bounded duration, and audio format are documented.
+- [ ] Selected Windows microphone/library passes the preflight for 16,000 Hz mono signed 16-bit PCM RIFF/WAV, including valid headers, sample count, duration and device release. Record device/library/version and any driver conversion settings.
+- [ ] Evaluation and runtime share the same capture/encoding path; no silent format fallback or undocumented preprocessing occurs.
 - [ ] Evaluation targets are agreed before scoring.
 - [ ] The 25-utterance evaluation is recorded with raw-transcript accuracy, meaning-changing errors, correction count, and measured latency.
 - [ ] Silence/noise cases are recorded; invented transcripts cannot reach Gemini without review.
@@ -18,10 +19,13 @@ Mark an item complete only with evidence, date, and relevant limitations. Record
 
 ## 2. Functional Behavior
 
-- [ ] Windows user can explicitly start/stop recording and see recording state.
-- [ ] Duration limit stops capture and releases the microphone.
+- [ ] CLI state/command table in `PHASE_2.md` is implemented and tested: `/voice`, `start`, `stop`, `transcribe`, `cancel`, `submit`, `edit`, `discard`, replacement text and `text: ` escape.
+- [ ] Entering `/voice` does not record; `start` records, `stop` retains audio without upload, and only `transcribe` uploads it.
+- [ ] Fixed 60-second limit stops capture without Enter, releases the microphone, discards partially typed control input and waits in captured state without uploading.
 - [ ] Cancellation before upload sends no audio; microphone remains closed outside recording.
 - [ ] Transcript can be reviewed, corrected, submitted, or discarded.
+- [ ] Invalid/blank commands leave the voice state unchanged; replacement validation preserves the old transcript on failure; bare control words remain ordinary text at the top-level prompt.
+- [ ] `/exit`, `/quit`, Ctrl+C and EOF follow the documented shutdown rules; no typed cancellation is advertised during STT/Gemini processing and no queued control input becomes an assistant request.
 - [ ] Only explicitly accepted, validated text reaches Gemini; transcripts cannot execute CLI commands.
 - [ ] Failed/cancelled STT or discarded transcripts do not call Gemini or alter conversation history.
 - [ ] Accepted input uses existing limits, complete-turn history, JSONL logging, and text output.
@@ -32,6 +36,7 @@ Mark an item complete only with evidence, date, and relevant limitations. Record
 - [ ] Missing/busy/disconnected microphone and denied permissions produce useful messages.
 - [ ] Missing/invalid STT key, network loss, timeout, rate limit, quota exhaustion and service failure are handled.
 - [ ] Empty/malformed transcription responses and over-limit accepted text are handled.
+- [ ] Unsupported capture format and malformed/empty/oversized WAV are rejected before upload with a clear error; no silent resampling or mislabeled sample rate.
 - [ ] No automatic paid upgrade, provider fallback, or unbounded retry exists.
 - [ ] Cancellation/shutdown closes audio and network resources and prevents stale submission.
 - [ ] Cleanup failures are reported without hiding the original failure.

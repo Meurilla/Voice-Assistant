@@ -2,13 +2,19 @@
 
 This repository contains the completed Phase 1 text-first command-line assistant foundation.
 
-Phase 1 is governed by `PHASE_1.md` and was approved in `PHASE_1_EXIT_CRITERIA.md` on 2026-07-10. Phase 2 scope and evaluation are now documented; the runtime remains text-only.
+The completed [Phase 1 contract](phases/phase_1/PHASE_1.md) and [exit criteria](phases/phase_1/PHASE_1_EXIT_CRITERIA.md) are archived as immutable history; Phase 1 was approved on 2026-07-10. Phase 2 scope and evaluation are now documented; the runtime remains text-only.
 
 ## Phase 2 Direction
 
 On 2026-09-16, the agreed direction became controlled English voice input on Windows with a portable core. [PHASE_2.md](PHASE_2.md) defines scope, the first free cloud STT candidate (Groq Whisper Large V3), account setup, privacy, and the recording evaluation plan. [PHASE_2_EXIT_CRITERIA.md](PHASE_2_EXIT_CRITERIA.md) tracks verification. Voice output is reserved for a separate Phase 3.
 
 No voice command or speech dependency is implemented yet. The setup and run instructions below apply to the existing text assistant. Account setup and live speech testing remain outstanding.
+
+The planned voice flow is `/voice` -> `start` -> `stop` -> `transcribe` -> review -> `submit`. Use `cancel` before upload, or `edit`/`discard` at transcript review. See the exact state and command rules in [the Phase 2 contract](PHASE_2.md#exact-cli-contract). Evaluation and runtime will use 16 kHz mono signed 16-bit PCM WAV, capped at 60 seconds, after a Windows device/library preflight.
+
+## Phase Document Convention
+
+Current phase documents, `AGENTS.md`, and README stay at the root. Completed phase contracts and exit evidence move to `phases/phase_<number>/` with their contents unchanged. Historical paths inside archived evidence refer to the layout at the time; active documents link to the archive. New decisions belong in the active phase contract.
 
 ## Phase 1 Status
 
@@ -137,4 +143,4 @@ Logs must never include API keys, raw environment dumps, or unnecessary system i
 
 ## Phase 1 Exit
 
-Phase 1 is complete. The original exit decision and the post-exit stabilization record, evidence, manual verification, log inspection, and validation results are recorded in `PHASE_1_EXIT_CRITERIA.md`.
+Phase 1 is complete. The original exit decision and the post-exit stabilization record, evidence, manual verification, log inspection, and validation results are recorded in [the archived Phase 1 exit criteria](phases/phase_1/PHASE_1_EXIT_CRITERIA.md).
